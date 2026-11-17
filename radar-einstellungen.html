@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HandKess Social Radar – Einstellungen</title>
+<style>
+  :root { --bg: #f7f7f7; --fl: #fff; --ink: #0f0f0f; --leise: #606060; --linie: #e0e0e0; --akz: #0b0b0b; --marke: #CDDE30; --gut: #0f7b3f; --schw: #b3261e; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f0f0f; --fl: #1f1f1f; --ink: #f1f1f1; --leise: #aaa; --linie: #3a3a3a; --akz: #CDDE30; --marke: #CDDE30; --gut: #7fd8a0; --schw: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 Roboto, -apple-system, Arial, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; } h2 { font-size: 16px; font-weight: 500; margin: 0 0 8px; }
+  .leise { color: var(--leise); font-size: 13px; }
+  section { background: var(--fl); border: 1px solid var(--linie); border-radius: 12px; padding: 16px; margin-top: 16px; }
+  label { display: block; font-size: 13px; color: var(--leise); margin: 10px 0 4px; }
+  input { font: inherit; width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--linie); border-radius: 8px; background: var(--bg); color: var(--ink); }
+  .zeile { display: flex; gap: 8px; align-items: center; } .zeile input { flex: 1; }
+  .paar { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button { font: inherit; font-size: 14px; height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--linie); background: transparent; color: var(--ink); cursor: pointer; }
+  button.haupt { background: var(--marke); border-color: var(--marke); color: #0b0b0b; font-weight: 600; }
+  .hk-symbol { width: 1.1em; height: 1.1em; vertical-align: -0.18em; margin-right: .35em; }
+  .hk { display: inline-flex; align-items: center; font: 900 1em/1 "Arial Black", "Helvetica Neue", Arial, sans-serif; letter-spacing: .01em; color: var(--ink); white-space: nowrap; }
+    .hk-punkt { width: .42em; height: .42em; border-radius: 50%; background: var(--marke); margin: 0 .16em; }
+    .hk-kess { font-style: italic; padding: 0 .12em; background: linear-gradient(transparent 58%, var(--marke) 58%); }
+    .hk-sub { font-weight: 500; margin-left: .55em; color: var(--leise); }
+  @media (prefers-color-scheme: dark) { .hk-kess { background: none; color: var(--marke); } }
+  ol { padding-left: 20px; margin: 8px 0 0; font-size: 14px; } li { margin: 4px 0; }
+  #meldung { min-height: 22px; margin-top: 10px; font-size: 14px; } .ok { color: var(--gut); } .fehler { color: var(--schw); }
+</style>
+</head>
+<body>
+<main>
+  <h1><img class="hk-symbol" src="icons/icon.svg" alt=""><span class="hk" aria-label="HandKess"><span class="hk-hand">HAND</span><span class="hk-punkt"></span><span class="hk-kess">KESS</span></span><span class="hk-sub">Social Radar</span></h1>
+  <div class="leise">Einstellungen · alles bleibt lokal in diesem Browser</div>
+
+  <section>
+    <h2>YouTube-API-Schlüssel</h2>
+    <div class="leise">HandKess Social Radar holt Views, Likes, Kommentare und Abonnenten über die offizielle YouTube Data API v3 – mit deinem eigenen, kostenlosen Schlüssel. Er wird nur an googleapis.com geschickt.</div>
+    <label for="schluessel">Schlüssel</label>
+    <div class="zeile">
+      <input id="schluessel" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…">
+      <button id="zeigen" type="button">Zeigen</button>
+    </div>
+    <div class="zeile" style="margin-top:10px">
+      <button id="speichernSchluessel" class="haupt" type="button">Speichern</button>
+      <button id="testen" type="button">Schlüssel testen</button>
+    </div>
+    <ol>
+      <li>console.cloud.google.com öffnen und ein Projekt anlegen (z. B. „HandKess Social Radar“).</li>
+      <li>„APIs &amp; Dienste“ → „Bibliothek“ → „YouTube Data API v3“ → aktivieren.</li>
+      <li>„Anmeldedaten“ → „Anmeldedaten erstellen“ → „API-Schlüssel“.</li>
+      <li>Schlüssel bearbeiten → „API-Einschränkungen“ → nur „YouTube Data API v3“ erlauben.</li>
+      <li>Schlüssel hier einfügen, speichern, testen.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Auswertung</h2>
+    <div class="paar">
+      <div><label for="gruen">Theoretische ER gut ab (%)</label><input id="gruen" type="number" min="0" step="0.1"></div>
+      <div><label for="rot">Theoretische ER schwach unter (%)</label><input id="rot" type="number" min="0" step="0.1"></div>
+      <div><label for="maxVideos">Videos pro Kanal laden (höchstens)</label><input id="maxVideos" type="number" min="50" max="1000" step="50"></div>
+      <div><label for="cacheStunden">Daten neu holen nach (Stunden)</label><input id="cacheStunden" type="number" min="1" max="168" step="1"></div>
+    </div>
+    <div class="leise" style="margin-top:8px">Pro 50 Videos kostet ein Abruf etwa 2 von 10.000 Einheiten des täglichen Gratis-Kontingents.</div>
+    <div class="zeile" style="margin-top:10px">
+      <button id="speichernAuswertung" class="haupt" type="button">Speichern</button>
+      <button id="cacheLeeren" type="button">Zwischenspeicher leeren</button>
+    </div>
+  </section>
+  <div id="meldung" role="status"></div>
+</main>
+<script src="radar-einstellungen.js"></script>
+</body>
+</html>
