@@ -125,6 +125,10 @@ Details in **[DATENSCHUTZ.md](DATENSCHUTZ.md)**. Die Nutzungsbedingungen der jew
 
 Die Screenshots zeigen **öffentlich sichtbare Zahlen echter YouTube-Kanäle** (Stand November 2026), ausgewählt als bunte Mischung aus Wissenskanälen, Creatorn und Unternehmen. „Doktor Whatson“ ist dabei nur als Beispiel für die Funktion „Mein Kanal“ markiert. Es besteht keine Verbindung oder Kooperation mit einem der gezeigten Kanäle; die Einordnungen sind automatische Berechnungen und keine Bewertung.
 
+## Entstehung
+
+Idee, Konzept, Anforderungen, Methodik und Kennzahlen sowie die Steuerung der Entwicklung, Tests und Abnahme jeder Version: **André Glebe**. Bei der Programmierung und technischen Umsetzung habe ich mit KI-Unterstützung gearbeitet (Claude von Anthropic).
+
 ## Lizenz
 
 Copyright © 2026 André Glebe (HandKess). **Alle Rechte vorbehalten** – der Code ist zur Ansicht veröffentlicht. Nutzung, Weitergabe oder Veränderung nur mit schriftlicher Erlaubnis. Siehe [LICENSE](LICENSE).
