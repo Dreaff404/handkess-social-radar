@@ -11,6 +11,25 @@ Alle Berechnungen stehen in [`kern.js`](../kern.js) (für alle Plattformen gleic
 | **Views pro Tag** | Views ÷ Tage seit Veröffentlichung (mind. 1) | gleicht das Alter der Beiträge aus |
 | **Einordnung** | Rang nach ER im Kanal, Faktor zum Kanal-Schnitt, Views ÷ Median | Leiste am einzelnen Video |
 
+## Video-Verlauf (YouTube, in Entwicklung)
+
+- **Ø Views pro Stunde seit Upload** = Views ÷ Stunden seit Veröffentlichung.
+- **Views pro Stunde aktuell** = Zuwachs der Views zwischen den letzten zwei Messpunkten ÷ Stunden dazwischen. Messpunkte entstehen bei jedem Abruf (Öffnen des Kanals oder Nachladen auf Wunsch), höchstens alle 30 Minuten, für Videos der letzten 30 Tage.
+- **Thumbnail-Wechsel:** YouTube behält die Bildadresse bei einem Tausch bei. Das Radar holt das Bild deshalb selbst und vergleicht eine Prüfsumme. Je Version werden die Views pro Stunde in ihrer Zeit gezeigt. Das ist ein Hinweis auf einen A/B-Test („Test & Compare“) oder einen bewussten Tausch – welche Varianten YouTube parallel ausspielt, ist öffentlich nicht sichtbar.
+
+## Kanal-Mix: Videos und Shorts (YouTube)
+
+- **Getrennt und zusammen:** Jede Kennzahl gibt es für lange Videos, für Shorts und für beides. Welche Basis eine Zahl hat, steht an jeder Kachel.
+- **Uploads pro Woche** = Uploads im Zeitraum ÷ Wochen, kaufmännisch gerundet und als ungefährer Wert gekennzeichnet („≈ 4“, unter 0,5 „< 1“).
+- **Ø Länge, Ø Views, theoretische ER, Reichweite, Views der Uploads im Zeitraum** – je mit Veränderung zum gleich langen Zeitraum davor (▲/▼ in Prozent).
+- **Ausrichtung** = Anteil der Shorts an den Uploads bzw. an den Views: unter 35 % „eher Video-Kanal“, über 65 % „eher Shorts-Kanal“, dazwischen gemischt.
+- **Platz im Kanal** auf der Videoseite: unter den Videos derselben Art und zusätzlich inklusive Shorts.
+- **Kanal-Views im Zeitraum** = Zuwachs der Gesamt-Views des Kanals aus dem eigenen Kanal-Verlauf. Der Wert steht erst bereit, wenn der Verlauf den Zeitraum abdeckt – bis dahin zeigt das Radar, seit wann es misst.
+
+## Video-Tracking (YouTube, in Entwicklung)
+
+Markierte Videos werden 1, 4, 8, 12 und 24 Stunden sowie 2 und 7 Tage nach Upload gemessen (Views). Ist Chrome zu einem Zeitpunkt nicht offen, wird die Messung nachgeholt und mit dem tatsächlichen Zeitpunkt gekennzeichnet („erst nach 12 Std.“). Alle fälligen Videos werden gebündelt abgefragt – eine API-Einheit je 50 Videos.
+
 ## Kanal
 
 - **Schnittwerte** (Ø Views, Ø ER, Ø Reichweite) über die Beiträge im gewählten Zeitraum.

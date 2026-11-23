@@ -234,6 +234,55 @@ const RadarKern = (() => {
     return { genug: true, anzahl: eintraege.length, mindestens, kanaele };
   }
 
+  // ---------- Kanal-Mix: Videos und Shorts (v2.3, André 2026-11-17) ----------
+  // Beiträge im Fenster [von, bis) Tage alt (nach Kennzahlen mit „tage“)
+  const fenster = (videos, von, bis) => videos.filter(v => v.tage >= von && v.tage < bis);
+  // Veränderung in Prozent ggü. dem Vorzeitraum (null, wenn kein Vergleich möglich)
+  const veraenderung = (jetzt, vorher) => jetzt != null && vorher ? (jetzt - vorher) / vorher * 100 : null;
+  // Zeitraum gegen den gleich langen Zeitraum davor: 7 gegen 7, 30 gegen 30 Tage …
+  function vergleich(videos, zeitraum, follower) {
+    if (!zeitraum) return null;
+    return { jetzt: kanalSchnitt(fenster(videos, 0, zeitraum), follower), vorher: kanalSchnitt(fenster(videos, zeitraum, 2 * zeitraum), follower) };
+  }
+  // Je Art: Uploads pro Woche, Ø Länge, Ø Views, Summe der Views der Uploads im Zeitraum – und dasselbe für den Vorzeitraum.
+  // Ausrichtung: Anteil der Shorts an den Uploads und an den Views (0 = reiner Video-Kanal, 100 = reiner Shorts-Kanal).
+  // Treiber: die Art, deren Upload-Views gegenüber dem Vorzeitraum am stärksten zugelegt haben.
+  function kanalMix(lang, shorts, zeitraum = 90) {
+    const z = zeitraum || 365;
+    const teil = liste => {
+      const im = fenster(liste, 0, z), vor = fenster(liste, z, 2 * z);
+      const summe = l => l.reduce((a, v) => a + (v.views || 0), 0);
+      return {
+        anzahl: im.length, proWoche: im.length / (z / 7), proWocheVorher: vor.length / (z / 7),
+        dauer: schnitt(im, v => v.dauerSek || null), views: schnitt(im, v => v.views), viewsVorher: schnitt(vor, v => v.views),
+        ter: schnitt(im, v => v.ter), terVorher: schnitt(vor, v => v.ter), reach: schnitt(im, v => v.reach), reachVorher: schnitt(vor, v => v.reach),
+        summe: summe(im), summeVorher: summe(vor), mitVorher: vor.length > 0
+      };
+    };
+    const v = teil(lang), sh = teil(shorts), alle = teil([...lang, ...shorts]);
+    const anteil = (a, b) => a + b ? b / (a + b) * 100 : null;
+    const zuwachsV = v.mitVorher ? v.summe - v.summeVorher : null, zuwachsS = sh.mitVorher ? sh.summe - sh.summeVorher : null;
+    let treiber = null;
+    if (zuwachsV != null || zuwachsS != null) {
+      const a = zuwachsV ?? -Infinity, b = zuwachsS ?? -Infinity;
+      treiber = Math.max(a, b) <= 0 ? "keiner" : b > a ? "shorts" : "videos";
+    }
+    return { videos: v, shorts: sh, alle, uploadsShorts: anteil(v.anzahl, sh.anzahl), viewsShorts: anteil(v.summe, sh.summe), treiber, zeitraum: z };
+  }
+  // Ausrichtung in Worten (Anteil Shorts in %)
+  const ausrichtung = a => a == null ? "–" : a < 35 ? "eher Video-Kanal" : a > 65 ? "eher Shorts-Kanal" : "gemischt";
+  // Kanal-Views in einem Zeitraum aus dem Kanal-Verlauf vk (Gesamt-Views zu Zeitpunkten). Braucht einen Punkt,
+  // der mindestens „tage“ alt ist; für den Vergleich einen, der doppelt so alt ist. Sonst: seit wann gemessen wird.
+  function kanalViewsZeitraum(vk, tage, jetzt = Date.now()) {
+    const p = (vk || []).filter(x => x[1] != null).sort((a, b) => a[0] - b[0]);
+    if (!p.length || !tage) return { messungSeit: p[0]?.[0] ?? null };
+    const letzter = p[p.length - 1], vor = (t) => [...p].reverse().find(x => x[0] <= letzter[0] - t * TAG_MS * 0.97);
+    const a = vor(tage), b = vor(2 * tage);
+    if (!a) return { messungSeit: p[0][0], ab: p[0][0] + tage * TAG_MS };
+    const zuwachs = letzter[1] - a[1], vorher = b ? a[1] - b[1] : null;
+    return { zuwachs, vorher, veraenderung: veraenderung(zuwachs, vorher), messungSeit: p[0][0] };
+  }
+
   // Hashtag vereinheitlichen: „Hook Frage“ → „#hook-frage“, „"#Talking Head"“ → „#talking-head“
   function tagNorm(text) {
     const s = String(text || "").trim().toLowerCase().replace(/["„“”'‚‘’]/g, "").replace(/^#+/, "").trim()
@@ -279,6 +328,14 @@ const RadarKern = (() => {
   // Ampel für die theoretische ER: gut ab gruen, schwach unter rot (Werte in Prozent, einstellbar)
   const ampel = (ter, { gruen = 5, rot = 1 } = {}) => ter == null ? "leer" : ter >= gruen ? "gut" : ter < rot ? "schwach" : "mittel";
 
+  // Ungefähre Anzahl, kaufmännisch gerundet (André): „≈ 4“, unter 0,5 „< 1“
+  const ungefaehr = n => n == null ? "–" : n < 0.5 ? "< 1" : "≈ " + Math.round(n).toLocaleString("de-DE");
+  // Veränderung mit Pfeil: „▲ +18 %“ / „▼ −7 %“
+  const pfeil = n => n == null || !isFinite(n) ? "" : (n >= 0.5 ? "▲ +" : n <= -0.5 ? "▼ −" : "● ") + (Math.abs(n) < 10 ? Math.round(Math.abs(n) * 10) / 10 : Math.round(Math.abs(n))).toLocaleString("de-DE") + " %";
+
+  // Nur https-Links aus Plattform-Daten zulassen (v2.2-Härtung) – alles andere wird zu einem harmlosen „#“
+  const sicher = u => /^https:\/\//i.test(String(u || "")) ? u : "#";
+
   // Anzeige auf Deutsch
   const zahl = n => n == null ? "–" : Math.round(n).toLocaleString("de-DE");
   const kurz = n => {
@@ -302,6 +359,6 @@ const RadarKern = (() => {
   // Unter 1 % zwei Nachkommastellen (echte ER-Werte und Quoten liegen oft bei 0,3–0,8 %)
   const prozent = n => n == null ? "–" : n > 0 && n < 0.005 ? "< 0,01 %" : (n >= 100 ? Math.round(n) : n < 1 ? Math.round(n * 100) / 100 : Math.round(n * 10) / 10).toLocaleString("de-DE") + " %";
 
-  return { dauerSek, tageSeit, kennzahlen, filtern, sortieren, kanalSchnitt, median, einordnung, isoWoche, trend, rollend, kanalScores, wachstumProWoche, SCORE_FELDER, VIEW_FAKTOR, viewModell, mitSchaetzung, PORTFOLIO, FELDER, portfolio, tagNorm, tagsAusEingabe, jeTag, marker, seitMarker, ampel, zahl, kurz, prozent, faktor, dauer, spanne };
+  return { dauerSek, tageSeit, kennzahlen, filtern, sortieren, kanalSchnitt, median, einordnung, isoWoche, trend, rollend, kanalScores, wachstumProWoche, SCORE_FELDER, VIEW_FAKTOR, viewModell, mitSchaetzung, PORTFOLIO, FELDER, portfolio, tagNorm, tagsAusEingabe, jeTag, marker, seitMarker, ampel, zahl, kurz, prozent, faktor, dauer, spanne, sicher, ungefaehr, pfeil, fenster, veraenderung, vergleich, kanalMix, ausrichtung, kanalViewsZeitraum };
 })();
 if (typeof module !== "undefined") module.exports = RadarKern;

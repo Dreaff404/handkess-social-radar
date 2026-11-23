@@ -10,7 +10,7 @@
   const P = RadarPlattform, K = RadarKern, B = P.begriffe;
   // Plattformen mit weiteren öffentlichen Zahlen (TikTok: Shares, Saves) hängen eigene Sortierungen an
   const SORTIERUNG = [["ter", "Theoretische ER"], ["reach", "Reichweite"], ["views", "Views"], ["likes", B.likes || "Likes"], ["kommentare", "Kommentare"], ...(P.extraSort || []), ["vpd", "Views pro Tag"], ["datum", "Datum"]];
-  const ZEITRAUM = [[30, "30 Tage"], [60, "60 Tage"], [90, "90 Tage"], [365, "1 Jahr"], [0, "Alle"]];
+  const ZEITRAUM = [[7, "7 Tage"], [30, "30 Tage"], [60, "60 Tage"], [90, "90 Tage"], [365, "1 Jahr"], [0, "Alle"]];
   const KACHELN = { follower: B.follower, ter: "Theoretische ER", reach: "Reichweiten-Score", views: "Ø Views", vpd: "Ø Views pro Tag", anzahl: `${B.einheiten} im Zeitraum` };
   const ANSICHT = { eingeklappt: false, videoEingeklappt: false, sort: "ter", richtung: "beste", zeitraum: 90, kacheln: { follower: true, ter: true, reach: true, views: true, vpd: false, anzahl: true } };
   const SEITE_GROESSE = 24;
@@ -19,6 +19,7 @@
   let daten = null;      // { kanal, videos, bereich, geladenAm, gemischt }
   let videos = [];       // mit Kennzahlen
   let einzel = null;     // nur „video“: das Video/der Beitrag mit Kennzahlen; daten/videos sind dann Kanal bzw. Profil
+  let basisWahl = null;   // YouTube: Kennzahlen für Videos, Shorts oder beides (null = Art des Tabs)
   let zweit = null;      // nur YouTube-Übersicht: { daten, videos } der Shorts
   let viewModell = null;   // Views-Schätzung (v1.5): aus den Beiträgen des Profils mit Views gelernt
   let ansicht = structuredClone(ANSICHT), tags = {}, markerListe = {}, einst = { gruen: 5, rot: 1 };
@@ -55,7 +56,7 @@
     if (!naechste) { aufraeumen(); s = null; return; }
     if (!neu && s && naechste.schluessel === s.schluessel && host?.isConnected) return;
     if (!neu) aufraeumen();   // altes Panel, ausgeblendetes Raster und Overlays der vorigen Seite weg, bevor die neue gesucht wird
-    s = naechste; daten = null; videos = []; zweit = null; einzel = null; filterTag = null; zeigen = SEITE_GROESSE; status = ""; laedt = "Lade Daten …";
+    s = naechste; daten = null; videos = []; zweit = null; einzel = null; basisWahl = null; filterTag = null; zeigen = SEITE_GROESSE; status = ""; laedt = "Lade Daten …";
     await laden();
     const anker = await warten(() => P.anker(s.bereich), 60000);   // manche Plattformen bauen den Inhalt erst spät auf
     if (nr !== lauf || !anker) return;
@@ -91,6 +92,8 @@
     zweit = r.zweit ? { daten: r.zweit, videos: r.zweit.videos.map(v => K.kennzahlen(v, r.zweit.kanal.follower)) } : null;
     einzel = r.einzel ? { ...K.kennzahlen(r.einzel, daten.kanal.follower), tags: r.einzel.tags || [] } : null;
     if (einzel && viewModell) { const sch = viewModell.schaetzen(einzel); if (sch) einzel.schaetzung = sch; }
+    if (einzel && P.thumbnails) verlaufLaden(einzel.kanalId || daten?.kanal?.id);
+    if (P.id === "youtube" && daten?.kanal?.id) kanalVerlaufLaden(daten.kanal.id);
     if (r.warten && !videos.length && !einzel) { laedt = r.hinweis; status = ""; daten = r.daten?.videos.length ? daten : null; }
     zeichnen();
     if (!istEinzel()) wochenstand();
@@ -120,12 +123,14 @@
       wurzel.addEventListener("pointerdown", e => { if (e.button === 0) klick(e); });
       wurzel.addEventListener("click", e => { if (e.detail === 0) klick(e); });
       wurzel.addEventListener("change", aenderung);
+      wurzel.addEventListener("toggle", e => { const t = e.target.closest?.("details[data-teil]"); if (!t) return; ansicht.teile = { ...ansicht.teile, [t.dataset.teil]: t.open }; speichern({ ansicht }); }, true);
       wurzel.addEventListener("keydown", taste);
       tastenAbschirmen(host);
       new MutationObserver(farben).observe(document.documentElement, { attributes: true, attributeFilter: [P.dunkelAttribut || "dark"] });
     }
     if (P.schwebend?.(s.bereich)) { host.setAttribute("data-schwebend", "ja"); if (host.parentElement !== anker) anker.appendChild(host); }
     else { host.removeAttribute("data-schwebend"); if (host.nextElementSibling !== anker) anker.parentElement.insertBefore(host, anker); }
+    host.toggleAttribute("data-seitenleiste", !!P.seitenleiste?.(s.bereich));   // YouTube-Videoseite: rechts über den Vorschlägen
     farben();
     beobachter?.disconnect();
     beobachter = new MutationObserver(() => { clearTimeout(overlayTimer); overlayTimer = setTimeout(() => { platzPruefen(); overlays(); }, 250); });
@@ -138,6 +143,7 @@
     if (!host || !s || P.schwebend?.(s.bereich)) return;
     const a = P.anker(s.bereich);
     if (a && a !== host && host.nextElementSibling !== a) a.parentElement.insertBefore(host, a);
+    host.toggleAttribute("data-seitenleiste", !!P.seitenleiste?.(s.bereich));
     const r = P.raster();
     if (r && P.mitRaster(s.bereich) && !ansicht.eingeklappt && daten && !P.laeuft?.() && r.style.display !== "none") r.style.display = "none";
   }
@@ -153,8 +159,20 @@
   const farben = () => host && host.setAttribute("data-dunkel", P.dunkel() ? "ja" : "nein");
 
   // ---------- Berechnung ----------
+  // YouTube: Rangliste wahlweise inkl. der anderen Art (Videos + Shorts), André 2026-11-17
+  // YouTube: Kennzahlen und Rangliste wahlweise für Videos, Shorts oder beides – in jedem Tab (André 2026-11-18).
+  // Standard ist die Art des geöffneten Tabs; die Wahl gilt, bis eine andere Seite geöffnet wird.
+  const mitBasis = () => !!(zweit && P.id === "youtube" && !istEinzel());
+  const aktBasis = () => !mitBasis() ? (daten?.bereich === "shorts" ? "shorts" : "videos") : basisWahl || (daten?.bereich === "shorts" ? "shorts" : "videos");
+  const BASIS_NAME = { videos: "Videos", shorts: "Shorts", alle: "Videos + Shorts" };
+  const langListe = () => daten?.bereich === "shorts" ? (zweit?.videos || []) : videos;
+  const shortsListe = () => daten?.bereich === "shorts" ? videos : (zweit?.videos || []);
+  const basisListe = () => !mitBasis() ? videos : { videos: langListe(), shorts: shortsListe(), alle: [...langListe(), ...shortsListe()] }[aktBasis()];
+  const mitZweit = () => mitBasis() && aktBasis() === "alle";
+  const zweitIds = () => new Set((zweit?.videos || []).map(v => v.id));
+  const istShort = v => new Set(shortsListe().map(x => x.id)).has(v.id);
   function sichtbar() {
-    const gefiltert = K.filtern(videos, { zeitraum: ansicht.zeitraum, tag: filterTag, tags });
+    const gefiltert = K.filtern(basisListe(), { zeitraum: ansicht.zeitraum, tag: filterTag, tags });
     return K.sortieren(gefiltert, ansicht.sort, ansicht.richtung);
   }
   const markerSchluessel = (d = daten) => d ? `${d.kanal.id}:${d.bereich}` : "";
@@ -187,8 +205,9 @@
           <span class="knoepfe">
             ${daten && !istEinzel() ? `<button data-aktion="speichern" class="${istGespeichert() ? "gespeichert" : ""}" title="${istGespeichert() ? "Gespeichert – Ordner unten im Panel" : "Profil in deine Übersicht aufnehmen"}">${istGespeichert() ? "★ Gespeichert" : "☆ Speichern"}</button>` : ""}
             ${daten && !istEinzel() ? `<button data-aktion="marker">Marker setzen</button>` : ""}
-            ${(daten || P.alleLaden) && !(istEinzel() && P.alleLaden) ? `<button data-aktion="neu" title="${P.alleLaden ? "Langsam scrollen, damit " + P.name + " alles nachlädt" : "Daten neu von " + P.name + " holen"}">${ladeKnopf}</button>` : ""}
-            ${!istEinzel() ? `<button class="zahnrad" data-aktion="zahnrad" aria-label="Kennzahlen einstellen" title="Kennzahlen einstellen">⚙</button>` : ""}
+            ${(daten || P.alleLaden) && !(istEinzel() && P.alleLaden) ? `<button data-aktion="neu" class="${istEinzel() ? "los" : ""}" title="${P.alleLaden ? "Langsam scrollen, damit " + P.name + " alles nachlädt" : "Daten neu von " + P.name + " holen"}">${ladeKnopf}</button>` : ""}
+            ${!istEinzel() ? `<button class="zahnrad" data-aktion="zahnrad" aria-label="Kennzahlen einstellen" title="Kennzahlen einstellen">⚙</button>`
+              : `<button class="zahnrad" data-aktion="einstellungen" aria-label="Einstellungen öffnen" title="Einstellungen">⚙</button>`}
           </span>
         </header>
         ${aufgeklappt ? koerper(liste, sum) : ""}
@@ -211,7 +230,9 @@
     }
     const alter = Math.round((Date.now() - daten.geladenAm) / 60000);
     const lauft = P.laeuft?.() ? ` · lädt nach … (${videos.length} ${B.einheiten})` : "";
-    return `${esc(daten.kanal.name)} · ${P.bereichName[s.bereich]} · Theoretische ER${s.bereich === "uebersicht" ? " (Videos)" : ""} <b>${K.prozent(sum.ter)}</b> · Ø <b>${K.kurz(sum.views)}</b> Views · Stand ${alter < 1 ? "gerade eben" : alter < 60 ? `vor ${alter} Min.` : `vor ${Math.round(alter / 60)} Std.`}${lauft}`;
+    const basis = P.id !== "youtube" ? "" : s.bereich === "uebersicht" ? (zweit ? " (Videos + Shorts)" : " (Videos)") : ` (${BASIS_NAME[aktBasis()]})`;
+    const sumK = P.id === "youtube" && s.bereich === "uebersicht" && zweit ? K.kanalSchnitt(K.filtern([...videos, ...zweit.videos], { zeitraum: ansicht.zeitraum }), daten.kanal.follower) : sum;
+    return `${esc(daten.kanal.name)} · ${P.bereichName[s.bereich]} · Theoretische ER${basis} <b>${K.prozent(sumK.ter)}</b> · Ø <b>${K.kurz(sumK.views)}</b> Views · Stand ${alter < 1 ? "gerade eben" : alter < 60 ? `vor ${alter} Min.` : `vor ${Math.round(alter / 60)} Std.`}${lauft}`;
   }
 
   function koerper(liste, sum) {
@@ -288,36 +309,53 @@
       </div>` : "";
   }
 
-  const kachelReihe = (werte, ohne = [], namen = {}) => `<div class="kacheln">${Object.keys(KACHELN).filter(id => ansicht.kacheln[id] && !ohne.includes(id)).map(id => `<div class="kachel"><div class="l">${namen[id] || KACHELN[id]}</div><div class="w">${werte[id]}</div></div>`).join("")}</div>`;
+  const kachelReihe = (werte, ohne = [], namen = {}, vgl = {}, basis = "") => `<div class="kacheln">${Object.keys(KACHELN).filter(id => ansicht.kacheln[id] && !ohne.includes(id)).map(id => `<div class="kachel"><div class="l">${namen[id] || KACHELN[id]}${basis && id !== "follower" ? ` <span class="bt">${basis}</span>` : ""}</div><div class="w">${werte[id]}</div>${vgl[id] ? `<div class="z vgl ${/▲/.test(vgl[id]) ? "plus" : /▼/.test(vgl[id]) ? "minus" : ""}">${vgl[id]}</div>` : ""}</div>`).join("")}</div>`;
+  // Vergleich jeder Kanal-Kennzahl mit dem gleich langen Zeitraum davor (7 gegen 7 Tage …)
+  function vergleichWerte(liste) {
+    const z = ansicht.zeitraum; if (!z || !daten) return {};
+    const vg = K.vergleich(liste, z, daten.kanal.follower), txt = f => { const p = K.pfeil(K.veraenderung(vg.jetzt[f], vg.vorher[f])); return p ? `${p} ggü. ${z} Tagen davor` : ""; };
+    return { ter: txt("ter"), reach: txt("reach"), views: txt("views"), vpd: txt("vpd"), anzahl: txt("anzahl") };
+  }
   const kachelWerte = (k, sum) => ({ follower: k.followerVersteckt ? "versteckt" : k.follower ? K.zahl(k.follower) : "–", ter: K.prozent(sum.ter), reach: K.prozent(sum.reach), views: K.zahl(sum.views), vpd: K.zahl(sum.vpd), anzahl: K.zahl(sum.anzahl) });
 
   // YouTube-Übersicht: Kanal allgemein – Videos und Shorts nebeneinander, ohne Rangliste
   function uebersicht() {
-    const zeit = `<div class="reihe"><span class="lab">Zeitraum</span>${ZEITRAUM.map(([t, n]) => chip("zeitraum", t, n, ansicht.zeitraum === t)).join("")}</div>`;
+    const zeit = `<div class="auswahl"><div class="reihe"><span class="lab">Zeitraum</span>${ZEITRAUM.map(([t, n]) => chip("zeitraum", t, n, ansicht.zeitraum === t)).join("")}</div></div>`;
     const block = (titel, d, vids, tab) => {
       const sum = K.kanalSchnitt(K.filtern(vids, { zeitraum: ansicht.zeitraum }), d.kanal.follower);
-      return `<div class="block"><div class="block-kopf"><b>${titel}</b><button data-aktion="tab" data-wert="${tab}">Rangliste öffnen</button></div>
-        ${kachelReihe(kachelWerte(d.kanal, sum), ["follower"], tab === "shorts" ? { anzahl: "Shorts im Zeitraum" } : {})}
-        <div class="marker">${markerZeile(d, vids)}</div></div>`;
+      return `<div class="block ${tab ? "" : "gesamt"}"><div class="block-kopf"><b>${titel}</b>${tab ? `<button data-aktion="tab" data-wert="${tab}">Rangliste öffnen</button>` : ""}</div>
+        ${kachelReihe(kachelWerte(d.kanal, sum), ["follower"], tab === "shorts" ? { anzahl: "Shorts im Zeitraum" } : tab ? {} : { anzahl: "Uploads im Zeitraum" }, vergleichWerte(vids), tab === "shorts" ? "Shorts" : tab ? "Videos" : zweit ? "Videos + Shorts" : "")}
+        ${tab ? `<div class="marker">${markerZeile(d, vids)}</div>` : ""}</div>`;
     };
     return `${einstZeile()}
-      <div class="oben"><div class="kachel"><div class="l">${B.follower}</div><div class="w">${kachelWerte(daten.kanal, {}).follower}</div></div>${zeit}</div>
-      ${block("Videos", daten, videos, "videos")}
-      ${zweit ? block("Shorts", zweit.daten, zweit.videos, "shorts") : `<div class="leise zeile">Keine getrennten Shorts für diesen Kanal.</div>`}
+      <div class="oben"><div class="kachel"><div class="l">${B.follower}</div><div class="w">${kachelWerte(daten.kanal, {}).follower}</div></div></div>
+      ${zweit ? block("Gesamtkanal · Videos + Shorts", daten, [...videos, ...zweit.videos], null) : ""}
+      ${zeit}
+      ${kanalMixBlock(true)}
+      ${block("Nur Videos", daten, videos, "videos")}
+      ${zweit ? block("Nur Shorts", zweit.daten, zweit.videos, "shorts") : `<div class="leise zeile">Keine getrennten Shorts für diesen Kanal.</div>`}
       <div class="leise zeile">Sortierung, Hashtags und Rangliste findest du in den Tabs Videos und Shorts. Auf den Vorschaubildern hier steht die theoretische ER.</div>`;
   }
 
   // Einzelnes Video / einzelner Beitrag: Einordnung, Quoten, Hashtags, Tags des Creators
+  // Abschnitte der Videoseite einzeln einklappbar; der Zustand wird gemerkt (ansicht.teile)
+  const teilOffen = (teil, standard = true) => ansicht.teile?.[teil] ?? standard;
+  const abschnitt = (teil, titel, inhalt, standard = true, zusatz = "") => inhalt ? `<details class="teil" data-teil="${teil}" ${teilOffen(teil, standard) ? "open" : ""}><summary>${titel}${zusatz}</summary>${inhalt}</details>` : "";
   function einzelLeiste(bekannte) {
     if (!einzel) return "";
     const v = einzel, e = K.einordnung(v, videos, { zeitraum: ansicht.zeitraum });
     const zr = ZEITRAUM.find(([t]) => t === ansicht.zeitraum)?.[1] || "";
     const kachel = (l, w, zusatz = "") => `<div class="kachel"><div class="l">${l}</div><div class="w">${w}</div>${zusatz ? `<div class="z">${zusatz}</div>` : ""}</div>`;
     const mitViews = v.views != null;
+    const art = P.id === "youtube" ? (daten.bereich === "shorts" ? " der Shorts" : " der Videos") : "";
     return `
-      <div class="kacheln">
-        ${videos.length ? kachel(`Platz im ${B.kanal}`, `${e.platz} / ${e.von}`, `nach theoretischer ER · ${zr}${e.imZeitraum ? "" : ` · ${B.einheit} liegt außerhalb`}`) : ""}
-        ${kachel("Theoretische ER", K.prozent(v.ter), e.terFaktor != null ? `${K.faktor(e.terFaktor)} ${B.kanal}-Schnitt` : "")}
+      <div class="reihe"><span class="lab">Vergleich</span>${ZEITRAUM.map(([t, n]) => chip("zeitraum", t, n, ansicht.zeitraum === t)).join("")}
+        ${daten.kanal.handle || daten.kanal.id ? `<button data-aktion="tab" data-wert="${esc(P.ranglistePfad(daten))}">${B.kanal}-Rangliste öffnen</button>` : ""}</div>
+      ${abschnitt("thumb", "Thumbnail", P.thumbnails && v.id ? `<figure class="thumb-gross"><img src="https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/hqdefault.jpg" alt="Thumbnail dieses Videos" referrerpolicy="no-referrer">
+        <button data-aktion="thumb" data-wert="${esc(v.id)}">↓ Thumbnail in voller Auflösung</button></figure>` : "")}
+      ${abschnitt("zahlen", `Kennzahlen dieses ${B.einheit}s`, `<div class="kacheln">
+        ${videos.length ? kachel(`Platz im ${B.kanal}`, `${e.platz} / ${e.von}`, `${P.id === "youtube" ? (daten.bereich === "shorts" ? "unter den Shorts · " : "unter den Videos · ") : ""}nach theoretischer ER · ${zr}${e.imZeitraum ? "" : ` · ${B.einheit} liegt außerhalb`}${zweit && P.id === "youtube" ? (() => { const g = K.einordnung(v, [...videos, ...zweit.videos], { zeitraum: ansicht.zeitraum }); return `<br><b>inkl. ${daten.bereich === "shorts" ? "Videos" : "Shorts"}: Platz ${g.platz} / ${g.von}</b>`; })() : ""}`) : ""}
+        ${kachel("Theoretische ER", K.prozent(v.ter), e.terFaktor != null ? `${K.faktor(e.terFaktor)} ${B.kanal}-Schnitt${art}` : "")}
         ${mitViews ? kachel("Reichweite", K.prozent(v.reach), `Views ÷ ${B.follower}`) : ""}
         ${mitViews ? kachel("Views", K.kurz(v.views), e.viewsFaktor != null ? `${K.faktor(e.viewsFaktor)} Median des ${B.kanal}s` : "") : kachel(B.likes || "Likes", K.kurz(v.likes), "keine öffentlichen Views")}
         ${!mitViews && v.schaetzung ? kachel("Views (geschätzt)", `<span class="geschaetzt">${K.spanne(v.schaetzung)}</span>`, schaetzHinweis()) : ""}
@@ -327,14 +365,13 @@
         ${v.shares != null ? kachel("Shares", K.kurz(v.shares), v.views ? `${K.prozent(v.shares / v.views * 100)} der Views` : "") : ""}
         ${v.saves != null ? kachel("Saves", K.kurz(v.saves), v.views ? `${K.prozent(v.saves / v.views * 100)} der Views` : "") : ""}
         ${v.dauerSek ? kachel("Dauer", K.dauer(v.dauerSek), e.dauerSchnitt ? `${B.kanal}-Schnitt ${K.dauer(e.dauerSchnitt)}` : "") : ""}
-      </div>
-      <div class="reihe"><span class="lab">Vergleich</span>${ZEITRAUM.map(([t, n]) => chip("zeitraum", t, n, ansicht.zeitraum === t)).join("")}
-        ${daten.kanal.handle || daten.kanal.id ? `<button data-aktion="tab" data-wert="${esc(P.ranglistePfad(daten))}">${B.kanal}-Rangliste öffnen</button>` : ""}</div>
-      <div class="reihe"><span class="lab">Formate</span>
+      </div>`)}
+      ${P.thumbnails && v.id ? abschnitt("leistung", "Leistung über die Zeit", leistungBlock(v), true, ` <span class="entw">in Entwicklung</span>`) : ""}
+      ${abschnitt("tags", "Formate &amp; Tags", `<div class="reihe"><span class="lab">Formate</span>
         <span class="tags">${(tags[v.id] || []).map(t => `<button class="tag" data-aktion="tagWeg" data-video="${v.id}" data-wert="${esc(t)}" title="Entfernen">${esc(t)} ×</button>`).join("")}</span>
         <input class="tageingabe schmal" list="radar-tags" data-video="${v.id}" placeholder="#format + Enter" aria-label="Hashtag für diesen ${B.einheit}"></div>
       <datalist id="radar-tags">${bekannte.map(t => `<option value="${esc(t)}">`).join("")}</datalist>
-      <div class="reihe"><span class="lab">${B.tagsCreator}</span>${v.tags.length ? `<span class="yt-tags">${v.tags.map(t => `<span class="yt-tag">${esc(t)}</span>`).join("")}</span>` : `<span class="leise">${B.keineTags}</span>`}</div>`;
+      <div class="reihe"><span class="lab">${B.tagsCreator}</span>${v.tags.length ? `<span class="yt-tags">${v.tags.map(t => `<span class="yt-tag">${esc(t)}</span>`).join("")}</span>` : `<span class="leise">${B.keineTags}</span>`}</div>`)}`;
   }
 
   function rangliste(liste, werte, alleTags, bekannte, proTag) {
@@ -342,12 +379,14 @@
     return `${einstZeile()}
       ${fehlend && nachladenRest == null ? `<div class="hinweis">${fehlend} Reels ohne Views – ${P.name} zeigt Views nur im Reels-Tab. <button data-aktion="viewsNachladen">Views nachladen</button></div>` : ""}
       ${nachladenRest != null ? `<div class="hinweis">${nachladenRest ? `${nachladenRest} Reels blieben ohne Views – sie stehen nicht im Reels-Tab (z. B. Kooperationen anderer Konten).` : "Views nachgeladen."}</div>` : ""}
-      ${kachelReihe(werte)}
+      ${kachelReihe(werte, [], P.id === "youtube" && daten.bereich === "videos" && aktBasis() !== "videos" ? { anzahl: "Beiträge im Zeitraum" } : {}, vergleichWerte(basisListe()), P.id === "youtube" ? BASIS_NAME[aktBasis()] : "")}
+      <div class="auswahl"><div class="reihe"><span class="lab">Zeitraum</span>${ZEITRAUM.map(([t, n]) => chip("zeitraum", t, n, ansicht.zeitraum === t)).join("")}</div>
+        ${mitBasis() ? `<div class="reihe"><span class="lab">Kennzahlen</span>${["videos", "shorts", "alle"].map(b => chip("basis", b, BASIS_NAME[b], aktBasis() === b)).join("")}</div>` : ""}</div>
+      ${kanalMixBlock(true)}
       ${schaetzZeile()}
       <div class="marker">${markerZeile(daten, videos)}</div>
       <div class="reihe"><span class="lab">Sortieren</span>${SORTIERUNG.map(([id, n]) => chip("sort", id, n, ansicht.sort === id)).join("")}</div>
-      <div class="reihe"><span class="lab">Richtung</span>${chip("richtung", "beste", "Beste", ansicht.richtung === "beste")}${chip("richtung", "schlechteste", "Schlechteste", ansicht.richtung === "schlechteste")}
-        <span class="lab abstand">Zeitraum</span>${ZEITRAUM.map(([t, n]) => chip("zeitraum", t, n, ansicht.zeitraum === t)).join("")}</div>
+      <div class="reihe"><span class="lab">Richtung</span>${chip("richtung", "beste", "Beste", ansicht.richtung === "beste")}${chip("richtung", "schlechteste", "Schlechteste", ansicht.richtung === "schlechteste")}</div>
       <div class="reihe"><span class="lab">Formate</span>${chip("tag", "", "Alle", !filterTag)}${alleTags.map(t => chip("tag", t, t, filterTag === t)).join("") || `<span class="leise">Noch keine Hashtags – trag sie unter den ${B.einheiten} ein.</span>`}</div>
       ${proTag.length ? `<div class="leise zeile">Theoretische ER je Format: ${proTag.map(t => `${esc(t.tag)} <b>${K.prozent(t.ter)}</b> (${t.anzahl})`).join(" · ")}</div>` : ""}
       <datalist id="radar-tags">${bekannte.map(t => `<option value="${esc(t)}">`).join("")}</datalist>
@@ -376,13 +415,141 @@
 
   const chip = (art, wert, name, an) => `<button class="chip ${an ? "an" : ""}" data-aktion="${art}" data-wert="${esc(wert)}">${esc(name)}</button>`;
 
+  // ---------- YouTube: Kanal-Mix aus Videos und Shorts (v2.3, André 2026-11-17) ----------
+  // Uploads pro Woche (≈, kaufmännisch gerundet), Ø Länge, Ø Views, Views der Uploads im Zeitraum – je Art und gesamt,
+  // jeweils mit Vergleich zum gleich langen Zeitraum davor. Dazu die Ausrichtung (Video- oder Shorts-Kanal) nach Uploads
+  // und nach Views, der Wachstumstreiber und – sobald gemessen – die echten Kanal-Views im Zeitraum.
+  let vkDaten = null, vkKanal = null, getracktDaten = {};
+  async function kanalVerlaufLaden(id) {
+    try {
+      const d = await chrome.storage.local.get(["vk:" + id, "getrackt"]);
+      vkDaten = d["vk:" + id] || []; vkKanal = id; getracktDaten = d.getrackt || {}; zeichnen();
+    } catch { }
+  }
+  function kanalMixBlock(offen) {
+    if (P.id !== "youtube" || !zweit) return "";
+    const lang = daten.bereich === "shorts" ? zweit.videos : videos, shorts = daten.bereich === "shorts" ? videos : zweit.videos;
+    const m = K.kanalMix(lang, shorts, ansicht.zeitraum), z = m.zeitraum, vglMoeglich = !!ansicht.zeitraum;
+    const d = (a, b) => vglMoeglich ? `<span class="vgl ${K.veraenderung(a, b) >= 0.5 ? "plus" : K.veraenderung(a, b) <= -0.5 ? "minus" : ""}">${K.pfeil(K.veraenderung(a, b))}</span>` : "";
+    const zeile = (l, f) => `<tr><th>${l}</th>${[m.videos, m.shorts, m.alle].map(t => `<td>${f(t)}</td>`).join("")}</tr>`;
+    // Geteilter Balken (André 2026-11-18): links Videos (grau), rechts Shorts (Limette) – jeder Teil so breit wie sein Anteil
+    // Zwei abgerundete Balken (Videos links, Shorts rechts), Breite = Anteil, mit Lücke – darüber ein durchgehender
+    // Verlauf von Grau zu Limette (André 2026-11-18). Sehr kleine Anteile bleiben als schmaler Balken sichtbar.
+    const balken = (l, a) => { if (a == null) return ""; const sv = Math.max(4, 100 - a), ss = Math.max(4, a), summe = sv + ss;
+      // Beschriftung immer unter dem Balken – beide Seiten, auch bei sehr kleinem Anteil (André 2026-11-18, v2.3.4)
+      return `<div class="ausr"><div class="ausr-kopf"><span class="ausr-l">${l}:</span> <b data-ausr-urteil>${K.ausrichtung(a)}</b></div><div class="ausr-mitte"><div class="ausr-bahn" role="img" aria-label="${l}: ${Math.round(100 - a)} % Videos, ${Math.round(a)} % Shorts">
+        <span class="teil-v" style="flex:${sv} 0 0;background-size:${summe / sv * 100}% 100%"></span><span class="teil-s" style="flex:${ss} 0 0;background-size:${summe / ss * 100}% 100%"></span></div>
+        <div class="ausr-lab"><span data-ausr-v>Videos ${Math.round(100 - a)} %</span><span data-ausr-s>Shorts ${Math.round(a)} %</span></div></div></div>`; };
+    const kv = vkKanal === daten.kanal.id ? K.kanalViewsZeitraum(vkDaten, ansicht.zeitraum) : null;
+    const kvText = !ansicht.zeitraum ? "" : !kv?.messungSeit ? "Kanal-Views: noch keine Messung" : kv.zuwachs == null
+      ? `Kanal-Views in ${z} Tagen: misst seit ${new Date(kv.messungSeit).toLocaleDateString("de-DE")} – Wert ab ${new Date(kv.ab).toLocaleDateString("de-DE")}`
+      : `Kanal-Views in ${z} Tagen: <b>+${K.kurz(kv.zuwachs)}</b>${kv.vorher != null ? ` ${d(kv.zuwachs, kv.vorher)} ggü. den ${z} Tagen davor` : " (Vergleich, sobald doppelt so lange gemessen)"}`;
+    const teil = istEinzel() ? "mix" : "mixKanal";
+    return `<details class="mix" data-teil="${teil}" ${teilOffen(teil, offen) ? "open" : ""}><summary>Kanal-Mix: Videos &amp; Shorts <span class="leise">· ${ansicht.zeitraum ? `letzte ${z} Tage ggü. davor` : "letztes Jahr"}</span></summary>
+      <table class="mix-tab"><thead><tr><th></th><th>Videos</th><th>Shorts</th><th>Gesamt</th></tr></thead><tbody>
+        ${zeile("Uploads pro Woche", t => `${K.ungefaehr(t.proWoche)} ${d(t.proWoche, t.proWocheVorher)}`)}
+        ${zeile("Ø Länge", t => K.dauer(t.dauer))}
+        ${zeile("Ø Views", t => `${K.kurz(t.views)} ${d(t.views, t.viewsVorher)}`)}
+        ${zeile("Theoretische ER", t => `${K.prozent(t.ter)} ${d(t.ter, t.terVorher)}`)}
+        ${zeile("Reichweite", t => `${K.prozent(t.reach)} ${d(t.reach, t.reachVorher)}`)}
+        ${zeile("Views der Uploads im Zeitraum", t => `${K.kurz(t.summe)} ${d(t.summe, t.summeVorher)}`)}
+      </tbody></table>
+      ${balken("Ausrichtung nach Uploads", m.uploadsShorts)}${balken("Ausrichtung nach Views", m.viewsShorts)}
+      ${kvText ? `<div class="zeile">${kvText}</div>` : ""}</details>`;
+  }
+  async function trackenUmschalten(id) {
+    const v = einzel, an = !getracktDaten[id];
+    const a = await new Promise(f => chrome.runtime.sendMessage({ typ: "tracken", id, kanalId: v?.kanalId || daten?.kanal?.id, titel: v?.titel, datum: v?.datum, an }, x => f(chrome.runtime.lastError ? null : x)));
+    if (!a || a.fehler) { status = a?.fehler || "Tracking nicht möglich."; zeichnen(); return; }
+    await kanalVerlaufLaden(daten.kanal.id);
+    setTimeout(() => { verlaufLaden(v?.kanalId || daten?.kanal?.id); kanalVerlaufLaden(daten.kanal.id); }, 2500);
+  }
+
+  // ---------- YouTube: Leistung über die Zeit und Thumbnails (v2.2, in Entwicklung) ----------
+  // Messpunkte schreibt der Hintergrund bei jedem Abruf (radar-hintergrund.js → „vv:<kanalId>“). Views pro Stunde:
+  // im Schnitt seit Upload sofort; „aktuell“ erst ab zwei Messpunkten – die gibt es nur, wenn der Kanal erneut geladen wurde.
+  let vvEinzel = null;
+  async function verlaufLaden(kanalId) {
+    if (!kanalId) return;
+    try { vvEinzel = (await chrome.storage.local.get("vv:" + kanalId))["vv:" + kanalId] || {}; zeichnen(); } catch { }
+  }
+  const proStunde = (a, b) => { const h = (b[0] - a[0]) / 36e5; return h > 0 ? (b[1] - a[1]) / h : null; };
+  const vorZeit = ms => { const min = Math.round(ms / 60000); return min < 60 ? `vor ${min} Min.` : min < 2880 ? `vor ${Math.round(min / 60)} Std.` : `vor ${Math.round(min / 1440)} Tagen`; };
+  // Kurve über die Stunden seit Upload (logarithmisch, damit die ersten Stunden sichtbar bleiben), Zeitpunkte als Marken
+  const MARKEN = [[1, "1 Std"], [4, "4 Std"], [8, "8 Std"], [12, "12 Std"], [24, "1 Tag"], [48, "2 Tage"], [168, "7 Tage"]];
+  function verlaufGrafik(p, datum) {
+    if (p.length < 2) return "";
+    const W = 300, H = 78, t0 = new Date(datum).getTime(), std = q => Math.max((q[0] - t0) / 36e5, 0.05);
+    const maxH = Math.max(...p.map(std)), lx = h => Math.log(1 + h) / Math.log(1 + Math.max(maxH, 1));
+    const v0 = Math.min(...p.map(x => x[1])), v1 = Math.max(...p.map(x => x[1])) || 1;
+    const x = q => 6 + lx(std(q)) * (W - 12), y = v => H - 18 - (v - v0) / Math.max(v1 - v0, 1) * (H - 26);
+    const pts = p.map(q => `${x(q).toFixed(1)},${y(q[1]).toFixed(1)}`).join(" "), l = p[p.length - 1];
+    const marken = MARKEN.filter(([h]) => h <= maxH * 1.05).map(([h, n]) => { const xx = 6 + lx(h) * (W - 12); return `<line x1="${xx}" x2="${xx}" y1="4" y2="${H - 14}" stroke="var(--linie)"/><text x="${xx}" y="${H - 3}" text-anchor="middle" font-size="8" fill="var(--leise)">${n}</text>`; }).join("");
+    return `<svg class="verlauf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Views seit Upload aus ${p.length} Messpunkten">${marken}<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
+      ${p.map(q => `<circle cx="${x(q).toFixed(1)}" cy="${y(q[1]).toFixed(1)}" r="2.5" fill="var(--ink)"><title>${K.zahl(std(q))} Std. nach Upload: ${K.zahl(q[1])} Views</title></circle>`).join("")}
+      <circle cx="${x(l).toFixed(1)}" cy="${y(l[1]).toFixed(1)}" r="4.5" fill="var(--marke)" stroke="var(--ink)" stroke-width="1.5"/></svg>`;
+  }
+  // Zeitpunkte des Trackings: gemessen (mit tatsächlicher Zeit), verpasst (zu spät gestartet / Chrome war aus) oder ausstehend
+  function meilensteinBlock(v) {
+    const t = getracktDaten[v.id]; if (!t) return "";
+    const t0 = new Date(v.datum).getTime();
+    return `<div class="meilen">${MARKEN.map(([h, n]) => {
+      const m = t.messungen?.[h];
+      if (!m) return `<span class="ms offen"><b>${n}</b>ausstehend</span>`;
+      const tatsaechlich = (m[0] - t0) / 36e5, spaet = tatsaechlich > h * 1.25 + 0.5;
+      return `<span class="ms ${spaet ? "spaet" : ""}" title="gemessen ${K.zahl(tatsaechlich)} Std. nach Upload"><b>${n}</b>${K.kurz(m[1])}${spaet ? `<small>erst nach ${K.zahl(tatsaechlich)} Std.</small>` : ""}</span>`;
+    }).join("")}</div>`;
+  }
+  function leistungBlock(v) {
+    if (!P.thumbnails || !v.id) return "";
+    const e = vvEinzel?.[v.id], p = e?.p || [], jetzt = Date.now();
+    const stunden = Math.max((jetzt - new Date(v.datum).getTime()) / 36e5, 1);
+    // „aktuell“: letzter Messpunkt gegen den jüngsten, der mindestens 15 Minuten davor liegt
+    const letzter = p[p.length - 1], davor = letzter && [...p].reverse().find(q => letzter[0] - q[0] >= 15 * 60000);
+    const aktuell = davor ? proStunde(davor, letzter) : null;
+    const zuAlt = (jetzt - new Date(v.datum).getTime()) / 864e5 > 30;
+    const kachel = (l, w, z) => `<div class="kachel"><div class="l">${l}</div><div class="w">${w}</div><div class="z">${z}</div></div>`;
+    // Thumbnail-Versionen mit Views pro Stunde in ihrer Zeit
+    const b = e?.b || [];
+    const proVersion = b.map((ver, i) => {
+      const bis = b[i + 1]?.t ?? Infinity, im = p.filter(q => q[0] >= ver.t - MESS_TOLERANZ && q[0] <= bis);
+      return { ...ver, vph: im.length >= 2 ? proStunde(im[0], im[im.length - 1]) : null, bis };
+    });
+    const wechsel = proVersion.length > 1;
+    return `<div class="leistung" data-leistung>
+      <div class="block-kopf">
+        <button class="mini ${getracktDaten[v.id] ? "an" : ""}" data-aktion="tracken" data-wert="${esc(v.id)}" title="Misst das Video nach 1, 4, 8, 12, 24 Stunden, 2 und 7 Tagen nach dem Upload">${getracktDaten[v.id] ? "◉ Wird getrackt – beenden" : "◎ Video tracken"}</button></div>
+      ${meilensteinBlock(v)}
+      <div class="kacheln">
+        ${kachel("Ø Views/Std seit Upload", K.zahl(v.views / stunden), `${K.zahl(stunden)} Std. online`)}
+        ${kachel("Views/Std aktuell", aktuell == null ? "–" : K.zahl(aktuell), aktuell == null ? (zuAlt ? "Verlauf nur für Videos der letzten 30 Tage" : "braucht eine zweite Messung – Kanal später neu laden") : `zwischen den letzten zwei Messungen (${vorZeit(letzter[0] - davor[0]).replace("vor ", "")} Abstand)`)}
+        ${kachel("Messpunkte", p.length, p.length ? `letzte ${vorZeit(jetzt - p[p.length - 1][0])}` : "noch keine")}
+      </div>
+      ${verlaufGrafik(p, v.datum)}
+      ${!wechsel ? "" : `<div class="thumbs wechsel">
+        ${wechsel ? `<div class="hinweis"><b>Thumbnail gewechselt</b> – ${proVersion.length} Versionen gesehen. Das kann ein A/B-Test („Test & Compare“) oder ein bewusster Tausch sein; welche Varianten YouTube parallel testet, ist öffentlich nicht sichtbar. Die zuletzt gesehene Version ist die aktuelle.</div>` : ""}
+        <div class="thumb-reihe">${(wechsel ? proVersion : [{ d: `https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/mqdefault.jpg`, t: null, vph: null }]).map((ver, i, alle) => `
+          <figure class="thumb ${i === alle.length - 1 ? "aktuell" : ""}"><img src="${esc(ver.d)}" alt="Thumbnail${wechsel ? " Version " + (i + 1) : ""}" referrerpolicy="no-referrer">
+            <figcaption>${wechsel ? `${i === alle.length - 1 ? "aktuell · " : ""}ab ${new Date(ver.t).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}<br>${ver.vph == null ? "zu wenig Messungen" : K.zahl(ver.vph) + " Views/Std"}` : "aktuelles Thumbnail"}</figcaption></figure>`).join("")}</div>
+      </div>`}</div>`;
+  }
+  const MESS_TOLERANZ = 5 * 60000;
+  async function thumbnailHerunterladen(id) {
+    try {
+      const a = await new Promise(f => chrome.runtime.sendMessage({ typ: "thumbnail", id }, x => f(chrome.runtime.lastError ? { fehler: "Keine Antwort" } : x)));
+      if (!a || a.fehler) { status = a?.fehler || "Thumbnail nicht verfügbar."; zeichnen(); return; }
+      const link = document.createElement("a");
+      link.href = a.bild; link.download = `Thumbnail_${id}_${a.groesse}.jpg`; document.body.appendChild(link); link.click(); link.remove();
+    } catch { }
+  }
+
   function karte(v, i) {
     const a = K.ampel(v.ter, einst);
     return `<article class="karte">
-      <a class="bild" href="${esc(v.url)}">${v.bild ? `<img src="${esc(v.bild)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}
-        <span class="platz">#${i + 1}</span><span class="er ${a}">ER ${K.prozent(v.ter)}</span></a>
+      <a class="bild" href="${esc(K.sicher(v.url))}">${v.bild ? `<img src="${esc(v.bild)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}
+        <span class="platz">#${i + 1}</span><span class="er ${a}">ER ${K.prozent(v.ter)}</span>${mitZweit() ? `<span class="art">${istShort(v) ? "Short" : "Video"}</span>` : ""}</a>
       <div class="info">
-        <a class="vtitel" href="${esc(v.url)}">${esc(v.titel)}</a>
+        <a class="vtitel" href="${esc(K.sicher(v.url))}">${esc(v.titel)}</a>
         <div class="kv"><span>Theoretische ER</span><b>${K.prozent(v.ter)}</b></div>
         <div class="kv"><span>Reichweite (Views ÷ ${B.folgerKurz})</span><b>${K.prozent(v.reach)}</b></div>
         <div class="kv"><span>${v.views != null ? K.zahl(v.views) + " Views" : v.schaetzung ? `<span class="geschaetzt" title="Geschätzt aus Likes und Kommentaren – ${esc(schaetzHinweis())}">${K.spanne(v.schaetzung)} Views (geschätzt)</span>` : "keine Views"}</span><span>vor ${K.zahl(v.tage)} ${Math.round(v.tage) === 1 ? "Tag" : "Tagen"}</span></div>
@@ -390,6 +557,7 @@
         ${v.shares != null || v.saves != null ? `<div class="kv"><span>${K.kurz(v.shares)} Shares</span><span>${v.saves != null ? K.kurz(v.saves) + " Saves" : ""}</span></div>` : ""}
         <div class="tags">${(tags[v.id] || []).map(t => `<button class="tag" data-aktion="tagWeg" data-video="${v.id}" data-wert="${esc(t)}" title="Entfernen">${esc(t)} ×</button>`).join("")}</div>
         <input class="tageingabe" list="radar-tags" data-video="${v.id}" placeholder="#format + Enter" aria-label="Hashtag für diesen ${B.einheit}">
+        ${P.thumbnails ? `<button class="mini" data-aktion="thumb" data-wert="${esc(v.id)}" title="Thumbnail in voller Auflösung herunterladen">↓ Thumbnail</button>` : ""}
       </div></article>`;
   }
 
@@ -436,6 +604,7 @@
       case "neu": if (P.alleLaden) { alleLaden(); return; } abrufen(true); return;
       case "viewsNachladen": P.viewsNachladen(daten.kanal.handle.toLowerCase()); return;
       case "marker": markerSetzen(); break;
+      case "thumb": thumbnailHerunterladen(w); return;
       case "speichern": if (istGespeichert()) { if (ansicht.eingeklappt) { ansicht.eingeklappt = false; speichern({ ansicht }); } } else profilSpeichern(); break;
       case "entfernen": speichernMit(g => { delete g.profile[profilSchluessel()]; }); return;
       case "mein": meinUmschalten(); return;
@@ -444,6 +613,8 @@
       case "sort": ansicht.sort = w; zeigen = SEITE_GROESSE; speichern({ ansicht }); break;
       case "richtung": ansicht.richtung = w; zeigen = SEITE_GROESSE; speichern({ ansicht }); break;
       case "zeitraum": ansicht.zeitraum = +w; zeigen = SEITE_GROESSE; speichern({ ansicht }); break;
+      case "basis": basisWahl = w; zeigen = SEITE_GROESSE; break;
+      case "tracken": trackenUmschalten(w); return;
       case "tag": filterTag = w || null; zeigen = SEITE_GROESSE; break;
       case "tagWeg": {
         const id = b.dataset.video;
@@ -518,6 +689,55 @@
     :host([data-schwebend="ja"]) { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(980px, calc(100vw - 32px));
       margin: 0; z-index: 2147483000; max-height: 60vh; overflow: auto; border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.28); }
     * { box-sizing: border-box; }
+    :host([data-seitenleiste]) { margin: 0 0 14px; font-size: 13px; }
+    :host([data-seitenleiste]) .panel { padding: 10px 12px; }
+    :host([data-seitenleiste]) .kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    :host([data-seitenleiste]) .kachel .w { font-size: 17px; }
+    :host([data-seitenleiste]) .kopf-info { min-width: 0; flex-basis: 100%; order: 3; }
+    :host([data-seitenleiste]) .lab { width: auto; margin-right: 4px; }
+    .vgl { font-size: 11px; white-space: nowrap; } .vgl.plus, .z.vgl.plus { color: var(--gut); } .vgl.minus, .z.vgl.minus { color: var(--schw); }
+    .mix { margin-top: 10px; border: 1px solid var(--linie); border-radius: 8px; padding: 6px 10px 10px; }
+    .mix summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 4px 0; }
+    .mix-tab { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+    .mix-tab th, .mix-tab td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--linie); white-space: nowrap; }
+    .mix-tab th:first-child { text-align: left; font-weight: 400; color: var(--leise); white-space: normal; }
+    .mix-tab thead th { color: var(--leise); font-weight: 600; }
+    /* Ausrichtung als ruhiger Block: Kopfzeile mit Urteil, Balken volle Breite, Anteile darunter (André 2026-11-18, v2.3.5) */
+    .ausr { margin-top: 14px; font-size: 12px; } .ausr + .ausr { margin-top: 12px; }
+    .ausr-kopf { margin-bottom: 5px; } .ausr-l { color: var(--leise); } .ausr-kopf b { font-weight: 700; }
+    .ausr-bahn { display: flex; gap: 4px; height: 14px; }
+    .ausr-lab { display: flex; justify-content: space-between; margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--leise); }
+    .ausr-lab [data-ausr-s] { color: var(--ink, inherit); }
+    .ausr-bahn span { display: flex; align-items: center; white-space: nowrap; overflow: hidden; padding: 0 8px; border-radius: 10px; min-width: 8px;
+      background-image: linear-gradient(90deg, #6f6f6a 0%, #a8ad7a 50%, var(--marke) 100%); background-repeat: no-repeat; }
+    .teil-v { color: #fff; background-position: left center; } .teil-s { color: #0b0b0b; justify-content: flex-end; background-position: right center; }
+    .art { position: absolute; bottom: 6px; left: 6px; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: var(--marke); color: #0b0b0b; }
+    .meilen { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .ms { display: flex; flex-direction: column; font-size: 11px; padding: 4px 7px; border-radius: 6px; background: var(--fl); min-width: 56px; }
+    .ms b { font-size: 10px; color: var(--leise); font-weight: 600; } .ms.offen { opacity: .55; } .ms.spaet { outline: 1px dashed var(--leise); } .ms small { font-size: 9px; color: var(--leise); }
+    button.mini.an { background: var(--marke); color: #0b0b0b; border-color: var(--marke); }
+    .teil { border-top: 1px solid var(--linie); margin-top: 8px; padding-top: 4px; }
+    .teil > summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 0; display: flex; align-items: center; gap: 8px; list-style: none; }
+    .teil > summary::before, .mix > summary::before { content: "▸"; color: var(--akz); width: 12px; } .teil[open] > summary::before, .mix[open] > summary::before { content: "▾"; }
+    .teil > summary::-webkit-details-marker, .mix > summary::-webkit-details-marker { display: none; }
+    .mix > summary { list-style: none; }
+    .auswahl { margin-top: 10px; padding: 4px 0 2px; }
+    .bt { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: var(--fl); border: 1px solid var(--linie); color: var(--leise); margin-left: 4px; white-space: nowrap; }
+    .kachel .l .bt { background: transparent; }
+    .thumb-gross { margin: 4px 0 0; }
+    .teil .leistung { margin-top: 0; border-top: 0; padding-top: 0; } .thumb-gross img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; display: block; }
+    .thumb-gross button { margin-top: 6px; }
+    .basis { font-size: 12px; color: var(--leise); margin-top: 8px; } .basis b { color: var(--ink); }
+    .block.gesamt { border-top: 2px solid var(--ink); }
+    .leistung { margin-top: 12px; border-top: 1px solid var(--linie); padding-top: 10px; }
+    .leistung .block-kopf { display: flex; align-items: center; gap: 8px; }
+    .entw { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; background: var(--marke); color: #0b0b0b; padding: 2px 6px; border-radius: 3px; }
+    .verlauf { width: 100%; height: 64px; display: block; margin-top: 8px; }
+    .thumbs { margin-top: 10px; } .thumb-reihe { display: flex; gap: 8px; overflow-x: auto; margin: 8px 0; }
+    .thumb { margin: 0; flex: 0 0 160px; } .thumb img { width: 160px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; display: block; border: 2px solid transparent; }
+    .thumb.aktuell img { border-color: var(--marke); } .thumbs:not(.wechsel) .thumb.aktuell img { border-color: transparent; }
+    .thumb figcaption { font-size: 11px; color: var(--leise); margin-top: 3px; line-height: 1.3; }
+    button.mini { font-size: 11px; min-height: 26px; padding: 2px 8px; margin-top: 6px; }
     .panel { border: 1px solid var(--akz); border-radius: 12px; background: var(--bg); padding: 12px 14px; }
     .panel.zu { padding: 8px 14px; }
     header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -529,6 +749,9 @@
     button { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--linie); border-radius: 8px; padding: 6px 10px; cursor: pointer; min-height: 32px; }
     button:hover { background: var(--fl); }
     .zahnrad { font-size: 18px; line-height: 1; padding: 4px 10px; }
+    /* Videoseite wie HandKess Crowd Pulse: „Neu laden“ als Limetten-Knopf, daneben das Zahnrad (André 2026-11-18, v2.3.6) */
+    button.los { background: var(--marke); border-color: var(--marke); color: #0b0b0b; font-weight: 700; }
+    button.los:hover { background: var(--marke); filter: brightness(1.06); }
     button.gespeichert { background: var(--akz-soft); color: var(--akz-text); border-color: var(--akz-soft); font-weight: 500; }
     select { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--linie); border-radius: 8px; padding: 6px 8px; min-height: 32px; }
     .chip.an { background: var(--akz-soft); color: var(--akz-text); border-color: var(--akz-soft); font-weight: 500; }

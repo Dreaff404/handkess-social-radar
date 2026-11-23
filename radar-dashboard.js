@@ -5,7 +5,7 @@
 const K = RadarKern;
 const PLATTFORMEN = { youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook" };
 const BEREICH = { videos: "Videos", shorts: "Shorts", beitraege: "Beiträge", reels: "Reels" };
-const ZEITRAUM = [[30, "30 Tage"], [60, "60 Tage"], [90, "90 Tage"], [365, "1 Jahr"], [0, "Alle"]];
+const ZEITRAUM = [[7, "7 Tage"], [30, "30 Tage"], [60, "60 Tage"], [90, "90 Tage"], [365, "1 Jahr"], [0, "Alle"]];
 const KACHELN = [
   { id: "ueberblick", titel: "Überblick" },
   { id: "vergleich", titel: "Wettbewerber im Vergleich" },
@@ -99,7 +99,8 @@ function zeichnen() {
   const sichtbar = profile.filter(p => (zustand.plattform === "alle" || p.plattform === zustand.plattform)
     && (zustand.ordner === "alle" || (zustand.ordner === "ohne" ? !p.ordner : p.ordner === zustand.ordner))).map(p => ({ ...p, w: werte(p) }));
   // Portfolio & Co. leben seit v2.0 im eigenen Analyse-Studio (radar-analyse.html)
-  $("tabs").innerHTML = `<button class="tab an" aria-pressed="true">Vergleich</button><a class="tab" href="radar-analyse.html" data-studio>Analyse-Studio ↗</a>`;
+  tabsZeichnen();
+  if (ansicht === "studio") return;   // im Analyse•Studio zeichnet radar-analyse.js
   const inhalt = { ueberblick: ueberblick(sichtbar), vergleich: vergleich(sichtbar), entwicklung: entwicklung(sichtbar), top: topBeitraege(sichtbar) };
   $("kacheln").innerHTML = layout.map((l, i) => {
     const k = KACHELN.find(x => x.id === l.id);
@@ -135,7 +136,7 @@ function ueberblick(ps) {
     ${zahl("Beste theoretische ER", bester ? K.prozent(bester.w.sum.ter) : "–", bester ? esc(bester.kanal.name) + " · " + PLATTFORMEN[bester.plattform] : "")}
     ${zahl("Stärkster Follower-Zuwachs", zuwachs ? (zuwachs.w.plus > 0 ? "+" : "") + K.zahl(zuwachs.w.plus) : "–", zuwachs ? esc(zuwachs.kanal.name) + " · seit Marker" : "noch keine Marker gesetzt")}
   </div>
-  ${faellig.length ? `<div class="faellig"><span class="lab">Fällig</span>${faellig.slice(0, 12).map(p => `<a class="tag" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.kanal.name || p.kanal.handle)}</a>`).join("")}</div>` : ""}`;
+  ${faellig.length ? `<div class="faellig"><span class="lab">Fällig</span>${faellig.slice(0, 12).map(p => `<a class="tag" href="${esc(K.sicher(p.url))}" target="_blank" rel="noopener">${esc(p.kanal.name || p.kanal.handle)}</a>`).join("")}</div>` : ""}`;
 }
 
 const SPALTEN = [
@@ -172,10 +173,10 @@ function vergleich(ps) {
   };
   const trendZelle = a => a == null ? `<span class="leise">–</span>` : `<span class="${a > 5 ? "plus" : a < -5 ? "minus" : ""}">${a > 0 ? "+" : ""}${Math.round(a).toLocaleString("de-DE")} %</span>`;
   const zeile = p => p.platzhalter
-    ? `<tr data-zeile="${esc(p.schluessel)}"><td><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.kanal.name || p.kanal.handle)}</a><div><span class="plattform">${PLATTFORMEN[p.plattform]}</span></div></td>
+    ? `<tr data-zeile="${esc(p.schluessel)}"><td><a href="${esc(K.sicher(p.url))}" target="_blank" rel="noopener">${esc(p.kanal.name || p.kanal.handle)}</a><div><span class="plattform">${PLATTFORMEN[p.plattform]}</span></div></td>
         <td></td><td colspan="7" class="leise">noch keine Zahlen – Profil einmal mit dem Radar öffnen</td><td class="aktion">${ordnerWahl(p)}</td></tr>`
     : `<tr data-zeile="${esc(p.schluessel + ":" + p.bereich)}" class="${p.mein ? "mein" : ""}">
-      <td><a href="${esc(p.url)}" target="_blank" rel="noopener" title="Stand ${p.stand ? new Date(p.stand).toLocaleDateString("de-DE") : "–"}">${esc(p.kanal.name || p.kanal.handle)}</a> ${p.mein ? ` <span class="mein-marke">Mein Kanal</span>` : ""}<div><span class="plattform">${PLATTFORMEN[p.plattform]}</span> <span class="leise">${BEREICH[p.bereich] || p.bereich}</span></div></td>
+      <td><a href="${esc(K.sicher(p.url))}" target="_blank" rel="noopener" title="Stand ${p.stand ? new Date(p.stand).toLocaleDateString("de-DE") : "–"}">${esc(p.kanal.name || p.kanal.handle)}</a> ${p.mein ? ` <span class="mein-marke">Mein Kanal</span>` : ""}<div><span class="plattform">${PLATTFORMEN[p.plattform]}</span> <span class="leise">${BEREICH[p.bereich] || p.bereich}</span></div></td>
       <td class="zahl-r">${scoreZelle(p)}</td>
       <td class="zahl-r">${p.kanal.follower ? K.zahl(p.kanal.follower) : "–"}</td>
       <td class="zahl-r">${er(p.w.sum.ter)}${vergleichMit(p).er}</td>
@@ -319,7 +320,7 @@ function topBeitraege(ps) {
   if (!beste.length) return `<div class="leer">Im Zeitraum gibt es keine Beiträge mit theoretischer ER.</div>`;
   return `<div class="liste">${beste.map(({ v, p, faktor }) => `<div class="beitrag">
       ${v.bild ? `<img src="${esc(v.bild)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<img alt="">`}
-      <div class="info"><a class="t" href="${esc(v.url)}" target="_blank" rel="noopener" title="${esc(v.titel)}">${esc(v.titel)}</a>
+      <div class="info"><a class="t" href="${esc(K.sicher(v.url))}" target="_blank" rel="noopener" title="${esc(v.titel)}">${esc(v.titel)}</a>
         <div><b>${K.faktor(faktor)}</b> <span class="leise">Profil-Schnitt · ER ${K.prozent(v.ter)}</span></div>
         <div class="leise">${esc(p.kanal.name)} · ${PLATTFORMEN[p.plattform]} · vor ${K.zahl(v.tage)} T</div></div></div>`).join("")}</div>`;
 }
@@ -343,8 +344,31 @@ function neuerOrdner() {
   return id;
 }
 
+// ---------- Ansicht: Vergleich oder Analyse•Studio auf derselben Seite (v2.3.3, André 2026-11-18) ----------
+const STUDIO_NAME = `Analyse<span class="as-p" aria-hidden="true"></span><span class="as-s">Studio</span>`;
+let ansicht = (location.hash === "#studio" || lies("hsr_ansicht") === "studio") ? "studio" : "vergleich";
+function tabsZeichnen() {
+  $("tabs").innerHTML = `<button class="tab ${ansicht === "vergleich" ? "an" : ""}" data-ansicht="vergleich" aria-pressed="${ansicht === "vergleich"}">Vergleich</button>`
+    + `<button class="tab ${ansicht === "studio" ? "an" : ""}" data-ansicht="studio" aria-pressed="${ansicht === "studio"}" aria-label="Analyse-Studio"><span class="as">${STUDIO_NAME}</span></button>`;
+  const studio = ansicht === "studio";
+  ["filter-ordner", "filter-plattform", "filter-zeitraum", "kacheln"].forEach(id => { $(id).hidden = studio; });
+  $("studio").hidden = !studio;
+  $("ansicht-titel").innerHTML = studio ? `<span class="as">${STUDIO_NAME}</span>` : "Vergleich";
+  document.title = `HandKess Social Radar – ${studio ? "Analyse-Studio" : "Vergleich"}`;
+  if (studio) window.RadarStudio?.zeigen();
+}
+function ansichtWechseln(neu) {
+  if (neu === ansicht) return;
+  if (document.body.classList.contains("bearbeiten")) bearbeitenAbbrechen();
+  ansicht = neu; merke("hsr_ansicht", ansicht);
+  history.replaceState(null, "", ansicht === "studio" ? "#studio" : location.pathname);
+  zeichnen();
+}
+
 // ---------- Bedienung ----------
 document.addEventListener("click", e => {
+  const t = e.target.closest("[data-ansicht]"); if (t) { ansichtWechseln(t.dataset.ansicht); return; }
+  if (e.target.closest("#studio")) return;   // Knöpfe im Analyse•Studio bedient radar-analyse.js
   const b = e.target.closest("button, th");
   if (!b) return;
   if (b.dataset.graphProfil) {
@@ -405,18 +429,23 @@ function bearbeiten(an) {
   $("zuruecksetzen").hidden = !an;
 }
 $("layout").onclick = () => {
+  if (ansicht === "studio" && window.RadarStudio) { bearbeiten(window.RadarStudio.layout.umschalten()); window.RadarStudio.neuZeichnen(); return; }
   if (document.body.classList.contains("bearbeiten")) { chrome.storage.local.set({ dashboardLayout: layout }); layoutVorher = null; bearbeiten(false); }
   else { layoutVorher = structuredClone(layout); bearbeiten(true); }
   zeichnen();
 };
-$("zuruecksetzen").onclick = () => { layout = structuredClone(LAYOUT_STANDARD); zeichnen(); };
+$("zuruecksetzen").onclick = () => { if (ansicht === "studio" && window.RadarStudio) { window.RadarStudio.layout.zuruecksetzen(); return; } layout = structuredClone(LAYOUT_STANDARD); zeichnen(); };
+function bearbeitenAbbrechen() {
+  if (ansicht === "studio" && window.RadarStudio) { bearbeiten(false); window.RadarStudio.layout.abbrechen(); return; }
+  layout = layoutVorher || layout; layoutVorher = null; bearbeiten(false); zeichnen();
+}
 // Profil in einen anderen Ordner (oder „+ Neuer Ordner“ über den Knopf oben)
 document.addEventListener("change", e => {
   const sel = e.target.closest("select[data-verschieben]");
   if (sel) aendern(g => { g.profile[sel.dataset.verschieben].ordner = sel.value || null; });
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && document.body.classList.contains("bearbeiten")) { layout = layoutVorher || layout; layoutVorher = null; bearbeiten(false); zeichnen(); }
+  if (e.key === "Escape" && document.body.classList.contains("bearbeiten")) bearbeitenAbbrechen();
 });
 $("einstellungen").onclick = () => chrome.runtime.openOptionsPage();
 

@@ -1,12 +1,14 @@
+// Eingebettet im Vergleichs-Dashboard (v2.3.3): gekapselt, damit sich die Namen nicht mit radar-dashboard.js überschneiden.
+(() => {
 // HandKess Social Radar – Analyse-Studio (M6, v2.0, André 2026-11-15).
 // Eigene Seite neben dem Vergleichs-Dashboard. Rechnet nur mit den selbst gespeicherten Profilen aus dem lokalen Speicher,
 // immer innerhalb einer Gruppe = Plattform + Bereich (Views sind zwischen Plattformen und Bereichen nicht vergleichbar).
 // Module: Portfolio (BCG), Du gegen die Gruppe (Netz), Diagramm-Baukasten, Formate, Posting-Zeiten, Ausreißer. Jede Grafik als PNG.
-// Keine Netzwerkverbindung: auch Vorschaubilder der Plattformen werden hier bewusst nicht geladen.
+// Netz: keine eigenen Abrufe außer YouTube-Thumbnails von i.ytimg.com (v2.2, André-Freigabe); Bilder anderer Plattformen werden nicht geladen.
 const K = RadarKern;
 const PLATTFORMEN = { youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook" };
 const BEREICH = { videos: "Videos", shorts: "Shorts", beitraege: "Beiträge", reels: "Reels" };
-const ZEITRAUM = [[30, "30 T"], [60, "60 T"], [90, "90 T"], [365, "1 Jahr"], [0, "Alle"]];
+const ZEITRAUM = [[7, "7 T"], [30, "30 T"], [60, "60 T"], [90, "90 T"], [365, "1 Jahr"], [0, "Alle"]];
 const TAG_MS = 864e5, BEWEGUNG_TAGE = 28;
 const $ = id => document.getElementById(id);
 const esc = t => String(t ?? "").replace(/[&<>"']/g, z => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[z]));
@@ -95,7 +97,8 @@ function gruppen() {
 let gruppe = [], heute = [], pfHeute = {}, pfDamals = {}, dein = null;
 function rechnen() {
   const alle = gruppen(), schluessel = Object.keys(alle).sort((a, b) => alle[b].length - alle[a].length);
-  if (!alle[zustand.gruppe]) zustand.gruppe = schluessel[0] || "";
+  // Gemerkte Gruppe nur ersetzen, wenn Daten da sind (das Studio zeichnet einmal vor dem Laden) – Rückfall bevorzugt „Videos“ (v2.3.7)
+  if (!alle[zustand.gruppe] && schluessel.length) zustand.gruppe = schluessel.find(g => g.endsWith(":videos")) || schluessel[0];
   gruppe = alle[zustand.gruppe] || [];
   const jetzt = Date.now();
   heute = gruppe.map(p => ({ p, k: { id: p.id, name: p.name, follower: p.kanal.follower || 0, dein: p.mein }, w: werte(p, jetzt), alt: werte(p, jetzt - BEWEGUNG_TAGE * TAG_MS) }));
@@ -164,7 +167,7 @@ function datenfeld(e) {
        ${a && a.feld !== "offen" ? `<div class="df-hinweis">Vor 4 Wochen ebenfalls ${FELD[a.feld]}</div>` : ""}`;
   const alter = e.p.stand ? (Date.now() - e.p.stand) / TAG_MS : null;
   return `${kopf}${inhalt}<div class="df-fuss"><span>Letzter Beitrag ${tage(st.letzter)}</span><span>Stand ${alter == null ? "–" : tage(alter)}</span></div>
-    <a class="df-link" href="${esc(e.p.url)}" target="_blank" rel="noopener">Kanal öffnen ↗</a>`;
+    <a class="df-link" href="${esc(K.sicher(e.p.url))}" target="_blank" rel="noopener">Kanal öffnen ↗</a>`;
 }
 function feldZeigen(id) {
   const ziel = document.getElementById("datenfeld"), e = heute.find(x => x.k.id === id);
@@ -228,7 +231,7 @@ function portfolioModul() {
     ${offen.length ? `<p class="leise">Ohne Platz (zu wenig Daten): ${offen.map(e => esc(e.k.name)).join(", ")}</p>` : ""}
     <details><summary>Wie jeder Kanal zu seinem Feld kommt</summary><div class="tabelle"><table><thead><tr><th>Profil</th><th>Feld</th><th class="r">Stärke</th><th class="r">Ø Views</th><th class="r">Theor. ER</th><th class="r">Reichweite</th><th class="r">Dynamik</th><th class="r">Views-Trend</th><th class="r">Follower/Woche</th><th class="r">ER-Trend</th></tr></thead><tbody>
     ${[...heute].sort((a, b) => ordnung[pfHeute[a.k.id]?.feld || "offen"] - ordnung[pfHeute[b.k.id]?.feld || "offen"]).map(e => { const p = pfHeute[e.k.id] || { feld: "offen" }, a = pfDamals[e.k.id];
-      return `<tr data-portfolio-zeile="${esc(e.k.id)}"><td><a href="${esc(e.p.url)}" target="_blank" rel="noopener">${esc(e.k.name)}</a>${e.k.dein ? " ●" : ""}</td>
+      return `<tr data-portfolio-zeile="${esc(e.k.id)}"><td><a href="${esc(K.sicher(e.p.url))}" target="_blank" rel="noopener">${esc(e.k.name)}</a>${e.k.dein ? " ●" : ""}</td>
       <td>${sym(p.feld, { g: 15 })} ${FELD[p.feld]}${a && a.feld !== "offen" && a.feld !== p.feld && p.feld !== "offen" ? `<div class="stand">vor 4 Wochen: ${FELD[a.feld]}</div>` : ""}</td>
       <td class="r"><b>${p.st ?? "–"}</b></td><td class="r">${K.kurz(e.w.views)}</td><td class="r">${K.prozent(e.w.ter)}</td><td class="r">${K.prozent(e.w.reach)}</td>
       <td class="r"><b>${p.dy ?? "–"}</b></td><td class="r">${pz(e.w.viewsTrend, true)}</td><td class="r">${pz(e.w.wachstum, true)}</td><td class="r">${pz(e.w.terTrend, true)}</td></tr>`; }).join("")}
@@ -363,26 +366,26 @@ function ausreisserModul() {
   }).filter(x => x.f >= 1.8).sort((a, b) => b.f - a.f)
     .filter((x, i, alle) => alle.slice(0, i).filter(y => y.e === x.e).length < 2).slice(0, 8);   // höchstens zwei je Kanal
   if (!liste.length) return leer("Keine Ausreißer in den letzten 30 Tagen – kein Beitrag kam auf das 1,8-Fache des eigenen Kanal-Medians.");
-  return `<div class="feed">${liste.map(({ e, v, f, w, m, art }) => `<article class="post" data-ausreisser><a href="${esc(v.url)}" target="_blank" rel="noopener"><div class="bild"><span class="faktor">${dez(f)}×</span></div>
+  return `<div class="feed">${liste.map(({ e, v, f, w, m, art }) => `<article class="post" data-ausreisser><a href="${esc(K.sicher(v.url))}" target="_blank" rel="noopener"><div class="bild">${e.p.plattform === "youtube" ? `<img src="https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<span class="faktor">${dez(f)}×</span></div>
     <div class="info"><b>${esc(v.titel)}</b>${esc(e.k.name)}${e.k.dein ? " ●" : ""} · vor ${Math.round(v.tage)} ${Math.round(v.tage) === 1 ? "Tag" : "Tagen"}<br>${K.kurz(w)} ${art} · Median ${K.kurz(m)}
-    <div style="margin-top:6px">${(tags[v.id] || []).slice(0, 2).map(t => `<span class="tag">${esc(t)}</span>`).join("")}${sym(pfHeute[e.k.id]?.feld, { g: 15 })}</div></div></a></article>`).join("")}</div>
+    <div style="margin-top:6px">${(tags[v.id] || []).slice(0, 2).map(t => `<span class="tag">${esc(t)}</span>`).join("")}${sym(pfHeute[e.k.id]?.feld, { g: 15 })}</div></div></a>${e.p.plattform === "youtube" ? `<button class="knopf thumb-knopf" data-thumb="${esc(v.id)}">↓ Thumbnail</button>` : ""}</article>`).join("")}</div>
     <p class="leise" style="margin:10px 0 0">Faktor = Wert ÷ Median des eigenen Kanals (90 Tage). Ab 1,8× gilt ein Beitrag als Ausreißer; höchstens zwei je Kanal.</p>`;
 }
 
 // ---------- Zeichnen ----------
 function plakate() {
-  if (!heute.length) { $("plakate").innerHTML = ""; return; }
+  if (!heute.length) { $("s-plakate").innerHTML = ""; return; }
   const stars = heute.filter(e => pfHeute[e.k.id]?.feld === "star");
   const alt = Math.max(...heute.map(e => e.p.stand ? (Date.now() - e.p.stand) / TAG_MS : 0));
   if (dein) {
     const p = pfHeute[dein.k.id], platz = [...heute].filter(e => e.w.views != null).sort((a, b) => b.w.views - a.w.views).indexOf(dein) + 1;
-    $("plakate").innerHTML = `
+    $("s-plakate").innerHTML = `
       <div class="plakat dein" data-plakat="feld"><div class="l">Dein Feld</div><div class="w">${p ? sym(p.feld, { g: 30 }) + FELD[p.feld] : "–"}</div><div class="z">${p ? (pfDamals[dein.k.id] && pfDamals[dein.k.id].feld !== "offen" ? "vor 4 Wochen: " + FELD[pfDamals[dein.k.id].feld] : "noch kein Stand von vor 4 Wochen") : "Portfolio ab 4 Profilen"}</div></div>
       <div class="plakat"><div class="l">Ø Views · Platz</div><div class="w">${platz ? `${platz} / ${heute.filter(e => e.w.views != null).length}` : "–"}</div><div class="z">${K.kurz(dein.w.views)} pro Beitrag</div></div>
       <div class="plakat"><div class="l">Views-Trend</div><div class="w">${pz(dein.w.viewsTrend, true)}</div><div class="z">letzte 30 Tage ggü. davor</div></div>
       <div class="plakat"><div class="l">Stars in der Gruppe</div><div class="w">${stars.length}</div><div class="z">${stars.filter(e => !e.k.dein).map(e => esc(e.k.name)).join(", ") || "–"}</div></div>`;
   } else {
-    $("plakate").innerHTML = `
+    $("s-plakate").innerHTML = `
       <div class="plakat dein"><div class="l">Kanäle in der Gruppe</div><div class="w">${heute.length}</div><div class="z">Markiere deinen Kanal im Radar mit „Mein Kanal“</div></div>
       <div class="plakat"><div class="l">Stars</div><div class="w">${stars.length}</div><div class="z">${stars.map(e => esc(e.k.name)).join(", ") || "–"}</div></div>
       <div class="plakat"><div class="l">Stärkster Views-Trend</div><div class="w">${pz(Math.max(...heute.map(e => e.w.viewsTrend ?? -Infinity)), true)}</div><div class="z">letzte 30 Tage ggü. davor</div></div>
@@ -390,26 +393,27 @@ function plakate() {
   }
 }
 function zeichnen() {
+  if (document.getElementById("studio").hidden) return;   // nur zeichnen, wenn der Reiter Analyse•Studio offen ist
   const { alle, schluessel } = rechnen();
   const anzahl = o => new Set(profile.filter(p => o === "ohne" ? !p.ordner : p.ordner === o).map(p => p.schluessel)).size;
-  $("filter-ordner").innerHTML = `<span class="lab">Ordner</span>` + [["alle", `Alle (${Object.keys(gespeichert.profile).length})`], ...gespeichert.ordner.map(o => [o.id, `${esc(o.name)} (${anzahl(o.id)})`]), ...(anzahl("ohne") ? [["ohne", `Ohne Ordner (${anzahl("ohne")})`]] : [])]
+  $("s-ordner").innerHTML = `<span class="lab">Ordner</span>` + [["alle", `Alle (${Object.keys(gespeichert.profile).length})`], ...gespeichert.ordner.map(o => [o.id, `${esc(o.name)} (${anzahl(o.id)})`]), ...(anzahl("ohne") ? [["ohne", `Ohne Ordner (${anzahl("ohne")})`]] : [])]
     .map(([id, n]) => `<button class="chip ${zustand.ordner === id ? "an" : ""}" data-ordner="${esc(id)}">${n}</button>`).join("");
-  $("filter-gruppe").innerHTML = `<span class="lab">Plattform</span>` + (schluessel.map(g => { const [pl, be] = g.split(":"); return `<button class="chip ${zustand.gruppe === g ? "an" : ""}" data-gruppe="${esc(g)}">${PLATTFORMEN[pl]} · ${BEREICH[be] || be} (${alle[g].length})</button>`; }).join("") || `<span class="leise">keine gespeicherten Profile mit Zahlen</span>`);
-  $("filter-zeitraum").innerHTML = `<span class="lab">Zeitraum</span>` + ZEITRAUM.map(([t, n]) => `<button class="chip ${zustand.zeitraum === t ? "an" : ""}" data-zeitraum="${t}">${n}</button>`).join("");
-  document.querySelectorAll("nav.leiste button").forEach(b => b.classList.toggle("an", b.dataset.modul === modul));
+  $("s-gruppe").innerHTML = `<span class="lab">Plattform</span>` + (schluessel.map(g => { const [pl, be] = g.split(":"); return `<button class="chip ${zustand.gruppe === g ? "an" : ""}" data-gruppe="${esc(g)}">${PLATTFORMEN[pl]} · ${BEREICH[be] || be} (${alle[g].length})</button>`; }).join("") || `<span class="leise">keine gespeicherten Profile mit Zahlen</span>`);
+  $("s-zeitraum").innerHTML = `<span class="lab">Zeitraum</span>` + ZEITRAUM.map(([t, n]) => `<button class="chip ${zustand.zeitraum === t ? "an" : ""}" data-zeitraum="${t}">${n}</button>`).join("");
+  document.querySelectorAll("#s-nav button").forEach(b => b.classList.toggle("an", b.dataset.modul === modul));
   const einzeln = modul !== "alle";
   if (!heute.length) {
-    $("plakate").innerHTML = "";
-    $("flaeche").innerHTML = `<section class="kachel">${leer(Object.keys(gespeichert.profile).length ? "In diesem Ordner liegen noch keine Profile mit gesammelten Zahlen. Öffne sie einmal mit dem Radar." : "Noch keine Profile gespeichert. Öffne einen Kanal mit dem Radar und klicke <b>„☆ Speichern“</b> – hier entsteht dann deine Analyse.")}</section>`;
+    $("s-plakate").innerHTML = "";
+    $("s-flaeche").innerHTML = `<section class="kachel">${leer(Object.keys(gespeichert.profile).length ? "In diesem Ordner liegen noch keine Profile mit gesammelten Zahlen. Öffne sie einmal mit dem Radar." : "Noch keine Profile gespeichert. Öffne einen Kanal mit dem Radar und klicke <b>„☆ Speichern“</b> – hier entsteht dann deine Analyse.")}</section>`;
     return;
   }
-  $("plakate").hidden = einzeln; if (!einzeln) plakate();
+  $("s-plakate").hidden = einzeln; if (!einzeln) plakate();
   const liste = einzeln ? [{ id: modul, breite: "voll", weg: false }] : layout;
-  $("flaeche").innerHTML = liste.map((l, i) => {
+  $("s-flaeche").innerHTML = liste.map((l, i) => {
     const m = MODULE.find(x => x.id === l.id);
     return `<section class="kachel ${l.breite === "halb" && !einzeln ? "halb" : ""} ${l.weg ? "weg" : ""}" data-kachel="${m.id}">
-      <div class="kachel-kopf"><span class="etikett">${m.titel}</span><span class="frage">${m.frage}</span>
-        <span class="werkzeug">
+      <div class="kachel-kopf"><h2>${m.titel}</h2><span class="frage">${m.frage}</span>
+        <span class="s-werkzeug">
           ${!einzeln ? `<button class="knopf nur-bearbeiten" data-schieben="-1" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Nach oben">↑</button><button class="knopf nur-bearbeiten" data-schieben="1" data-i="${i}" ${i === liste.length - 1 ? "disabled" : ""} aria-label="Nach unten">↓</button>
           <button class="knopf nur-bearbeiten" data-breite="${i}">${l.breite === "halb" ? "Volle Breite" : "Halbe Breite"}</button><button class="knopf nur-bearbeiten" data-weg="${i}">${l.weg ? "Einblenden" : "Ausblenden"}</button>
           <button class="knopf" data-oeffnen="${m.id}">Groß ↗</button>` : ""}<button class="knopf" data-png="${m.id}">↓ PNG</button>
@@ -420,7 +424,7 @@ function zeichnen() {
 // Namen in Streuung und Matrix platzieren: je Name den freiesten Platz rund um seinen Punkt suchen
 // (rechts, links, oben, unten, schräg) – Hindernisse sind alle Punkte und die schon gesetzten Namen.
 function entzerren() {
-  document.querySelectorAll("svg.chart").forEach(svg => {
+  document.querySelectorAll("#studio svg.chart").forEach(svg => {
     if (/Heatmap|Rangliste|Netz/.test(svg.getAttribute("aria-label") || "")) return;
     const gruppen = [...svg.querySelectorAll("g")].filter(g => g.querySelector(":scope > text.name") && g.querySelector(":scope > .punkt"));
     if (gruppen.length < 2) return;
@@ -456,6 +460,7 @@ function entzerren() {
 // ---------- Bedienung ----------
 const ansichtenSpeichern = () => chrome.storage.local.set({ analyseAnsichten: ansichten });
 document.addEventListener("click", e => {
+  if (!e.target.closest("#studio")) return;   // eingebettet im Dashboard: nur eigene Knöpfe
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.modul) { modul = b.dataset.modul; window.scrollTo(0, 0); }
   else if (b.dataset.oeffnen) { modul = b.dataset.oeffnen; window.scrollTo(0, 0); }
@@ -476,28 +481,24 @@ document.addEventListener("click", e => {
   else if (b.dataset.ansichtLaden != null) { const a = ansichten[+b.dataset.ansichtLaden]; bau = { x: a.x, y: a.y, typ: a.typ, log: !!a.log }; merke("hsr_bau", JSON.stringify(bau)); }
   else if (b.dataset.ansichtWeg != null) { ansichten.splice(+b.dataset.ansichtWeg, 1); ansichtenSpeichern(); }
   else if (b.dataset.png) { png(b.closest(".kachel")); return; }
+  else if (b.dataset.thumb) { thumbnailHerunterladen(b.dataset.thumb); return; }
   else return;
   zeichnen();
 });
-document.addEventListener("change", e => { const s = e.target.closest("[data-bau]"); if (!s) return; bau[s.dataset.bau] = s.value; merke("hsr_bau", JSON.stringify(bau)); zeichnen(); });
-// Hell/Dunkel und Paper – dieselben Schlüssel wie im Vergleichs-Dashboard
-const istDunkel = () => document.documentElement.getAttribute("data-theme") === "dark" || (!document.documentElement.hasAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
-const chips = () => { $("thema").textContent = istDunkel() ? "☀ Hell" : "☾ Dunkel"; const p = document.documentElement.getAttribute("data-look") === "paper"; $("look").textContent = p ? "▤ Paper an" : "▤ Paper"; $("look").classList.toggle("an", p); };
-$("thema").onclick = () => { const n = istDunkel() ? "light" : "dark"; document.documentElement.setAttribute("data-theme", n); merke("hsr_theme", n); chips(); };
-$("look").onclick = () => { const an = document.documentElement.getAttribute("data-look") !== "paper"; an ? document.documentElement.setAttribute("data-look", "paper") : document.documentElement.removeAttribute("data-look"); merke("hsr_look", an ? "paper" : "std"); chips(); };
-// Layout: Fertig speichert, Escape verwirft, Zurücksetzen = Standard
-const bearbeiten = an => { document.body.classList.toggle("bearbeiten", an); $("layout").textContent = an ? "Fertig" : "Layout anpassen"; $("zurueck").hidden = !an; $("layout").classList.toggle("an", an); };
-$("layout").onclick = () => {
-  if (document.body.classList.contains("bearbeiten")) { chrome.storage.local.set({ analyseLayout: layout }); layoutVorher = null; bearbeiten(false); }
-  else { modul = "alle"; layoutVorher = structuredClone(layout); bearbeiten(true); }
-  zeichnen();
+document.addEventListener("change", e => { const s = e.target.closest("#studio [data-bau]"); if (!s) return; bau[s.dataset.bau] = s.value; merke("hsr_bau", JSON.stringify(bau)); zeichnen(); });
+// Layout: Knöpfe „Layout anpassen“ / „Zurücksetzen“ / Escape gehören dem Dashboard – es ruft diese Schnittstelle auf
+const studioLayout = {
+  umschalten() {
+    if (document.body.classList.contains("bearbeiten")) { chrome.storage.local.set({ analyseLayout: layout }); layoutVorher = null; return false; }
+    modul = "alle"; layoutVorher = structuredClone(layout); return true;
+  },
+  zuruecksetzen() { layout = structuredClone(LAYOUT_STANDARD); zeichnen(); },
+  abbrechen() { layout = layoutVorher || layout; layoutVorher = null; zeichnen(); }
 };
-$("zurueck").onclick = () => { layout = structuredClone(LAYOUT_STANDARD); zeichnen(); };
-document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("bearbeiten")) { layout = layoutVorher || layout; bearbeiten(false); zeichnen(); } });
 // Tooltip
-const tipEl = $("tip");
+const tipEl = $("s-tip");
 document.addEventListener("pointermove", e => {
-  const z = e.target.closest("[data-tip]"); if (!z) { tipEl.classList.remove("an"); return; }
+  const z = e.target.closest("#studio [data-tip]"); if (!z) { tipEl.classList.remove("an"); return; }
   tipEl.innerHTML = z.dataset.tip; tipEl.classList.add("an");
   const r = tipEl.getBoundingClientRect(); tipEl.style.left = Math.min(e.clientX + 14, innerWidth - r.width - 8) + "px"; tipEl.style.top = Math.min(e.clientY + 14, innerHeight - r.height - 8) + "px";
 });
@@ -513,7 +514,7 @@ function png(kachel) {
     const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
     g.fillStyle = cs.getPropertyValue("--surface").trim() || "#fff"; g.fillRect(0, 0, W, H);
     g.fillStyle = "#0B0B0B"; g.fillRect(0, 0, W, kopf); g.fillStyle = "#CDDE30"; g.font = "900 22px 'Arial Black', Arial"; g.fillText("HAND•KESS", rand, 39);
-    g.fillStyle = "#F1F1EA"; g.font = "700 16px Arial"; g.fillText(kachel.querySelector(".etikett").textContent.toUpperCase() + "  ·  Social Radar", rand + 150, 38);
+    g.fillStyle = "#F1F1EA"; g.font = "700 16px Arial"; g.fillText(kachel.querySelector("h2").textContent.toUpperCase() + "  ·  Social Radar", rand + 150, 38);
     g.drawImage(bild, rand, kopf + rand);
     const [pl, be] = zustand.gruppe.split(":");
     g.fillStyle = cs.getPropertyValue("--muted").trim() || "#666"; g.font = "12px Arial"; g.fillText(`${PLATTFORMEN[pl] || ""} · ${BEREICH[be] || ""} · Stand ${new Date().toLocaleDateString("de-DE")}`, rand, H - 14);
@@ -521,13 +522,25 @@ function png(kachel) {
   };
   bild.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(kopie));
 }
-function melden(text) { const m = $("toast"); m.textContent = text; m.classList.add("an"); setTimeout(() => m.classList.remove("an"), 1600); }
+// Thumbnail in voller Auflösung (über den Hintergrund von i.ytimg.com, v2.2)
+function thumbnailHerunterladen(id) {
+  melden("Lade Thumbnail …");
+  chrome.runtime.sendMessage({ typ: "thumbnail", id }, a => {
+    if (chrome.runtime.lastError || !a || a.fehler) return melden(a?.fehler || "Thumbnail nicht verfügbar");
+    const link = document.createElement("a"); link.href = a.bild; link.download = `Thumbnail_${id}_${a.groesse}.jpg`; link.click(); melden("Thumbnail gespeichert");
+  });
+}
+function melden(text) { const m = $("s-toast"); m.textContent = text; m.classList.add("an"); setTimeout(() => m.classList.remove("an"), 1600); }
 
 // Start: gespeichertes Layout, dann Daten; bei Änderungen im Speicher (Radar sammelt in anderen Tabs) neu rechnen
 chrome.storage.local.get("analyseLayout").then(({ analyseLayout }) => {
   if (Array.isArray(analyseLayout)) layout = LAYOUT_STANDARD.map(s => ({ ...s, ...analyseLayout.find(l => l.id === s.id) }))
     .sort((a, b) => analyseLayout.findIndex(l => l.id === a.id) - analyseLayout.findIndex(l => l.id === b.id));
-  chips(); laden();
+  laden();
 });
 let neuTimer = 0;
 chrome.storage.onChanged.addListener(c => { if (Object.keys(c).some(k => /^(gespeichert|verlauf|cache:|ig:|tt:|fb:|marker|tags)/.test(k))) { clearTimeout(neuTimer); neuTimer = setTimeout(laden, 800); } });
+
+// Schnittstelle fürs Dashboard: Studio zeigen (neu zeichnen, sobald sichtbar – vorher lassen sich Beschriftungen nicht messen)
+window.RadarStudio = { zeigen() { zeichnen(); }, layout: studioLayout, neuZeichnen: () => zeichnen() };
+})();

@@ -121,12 +121,103 @@
   a.tab:hover { color: var(--ink); }
   :root[data-look="paper"] .tab.an { border-bottom-color: var(--akz); }
   @media (max-width: 899px) { #kacheln { grid-template-columns: 1fr; } .kachel.halb { grid-column: span 1; } .nur-desktop { display: none; } }
+
+  /* ===== Analyse•Studio, eingebettet (v2.3.3) – Farben und Karten des Vergleichs ===== */
+  :root { --raster: #eceef1; --andere: rgba(20,22,26,.42); --h0: #F4F7DC; --h1: #E2EC93; --h2: #C3D52C; --h3: #8E9C17; --h4: #4F5A0B; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --raster: #262a31; --andere: rgba(233,235,238,.45); --h0: #23270E; --h1: #3E4713; --h2: #6F7D19; --h3: #A9BC25; --h4: #E2F06A; } }
+  :root[data-theme="dark"] { --raster: #262a31; --andere: rgba(233,235,238,.45); --h0: #23270E; --h1: #3E4713; --h2: #6F7D19; --h3: #A9BC25; --h4: #E2F06A; }
+  :root[data-look="paper"] { --raster: #E7DFCC; --andere: rgba(43,38,32,.42); --h0: #F1EDD2; --h1: #DCDD9C; --h2: #B9C43A; --h3: #7F8A2A; --h4: #4C5420; }
+  @media (prefers-color-scheme: dark) { :root[data-look="paper"]:not([data-theme="light"]) { --raster: #2E2A25; --andere: rgba(228,220,203,.45); --h0: #2C2D1C; --h1: #47492A; --h2: #737C35; --h3: #A6B045; --h4: #D7DF84; } }
+  :root[data-look="paper"][data-theme="dark"] { --raster: #2E2A25; --andere: rgba(228,220,203,.45); --h0: #2C2D1C; --h1: #47492A; --h2: #737C35; --h3: #A6B045; --h4: #D7DF84; }
+  /* „Analyse•Studio“ nach der Logo-Logik: Punkt statt Strich, „Studio“ wie „KESS“ */
+  .as { white-space: nowrap; } .as-p { display: inline-block; width: .38em; height: .38em; border-radius: 50%; background: var(--marke); margin: 0 .14em; vertical-align: .12em; }
+  .as-s { color: var(--ink); background: linear-gradient(transparent 58%, var(--marke) 58%); padding: 0 .08em; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .as-s { background: none; color: var(--marke); } }
+  :root[data-theme="dark"] .as-s { background: none; color: var(--marke); }
+  #studio { margin-top: 4px; }
+  #s-nav { margin-top: 14px; }
+  #studio .plakate { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 16px; }
+  #studio .plakat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 12px; }
+  #studio .plakat .l { font-size: 12px; color: var(--muted); } #studio .plakat .w { font: 700 26px/1.15 var(--titel); margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+  #studio .plakat .z { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  #studio .plakat.dein { background: var(--marke); border-color: var(--marke); color: #0b0b0b; } #studio .plakat.dein .l, #studio .plakat.dein .z { color: rgba(11,11,11,.72); }
+  #studio .plakat .sym { width: 26px; height: 26px; }
+  #s-flaeche { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+  #studio .kachel-kopf { flex-wrap: wrap; } #studio .frage { color: var(--muted); font-size: 13px; flex: 1; min-width: 180px; }
+  #studio .s-werkzeug { display: flex; gap: 4px; margin-left: auto; }
+  #studio .knopf { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; min-height: 32px; cursor: pointer; }
+  #studio .knopf:hover { border-color: var(--akz); }
+  #studio .nur-bearbeiten { display: none; } body.bearbeiten #studio .nur-bearbeiten { display: inline-flex; }
+  #studio select { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-height: 40px; }
+  #studio .leise { color: var(--muted); font-size: 13px; }
+  #studio .leer-hinweis { padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); font-size: 14px; } #studio .leer-hinweis b { color: var(--ink); }
+  #studio .legende { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; align-items: center; }
+  #studio .legende i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 5px; }
+  #studio .legende .dein { background: var(--marke); outline: 2px solid var(--ink); outline-offset: -2px; } #studio .legende .andere { background: var(--andere); }
+  #studio svg text { font-family: var(--schrift); }
+  #studio .chart { width: 100%; max-width: 820px; height: auto; display: block; margin: 0 auto; }
+  #studio .achse line { stroke: var(--raster); stroke-width: 1; } #studio .achse text { fill: var(--muted); font-size: 11px; } #studio .achse .basis { stroke: var(--muted); }
+  #studio .ttl { fill: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  #studio .punkt { fill: var(--andere); stroke: var(--surface); stroke-width: 2; } #studio .punkt.dein { fill: var(--marke); stroke: var(--ink); stroke-width: 2.5; }
+  #studio .balken { fill: var(--andere); } #studio .balken.dein { fill: var(--marke); stroke: var(--ink); stroke-width: 2; }
+  #studio .name { fill: var(--ink); font-size: 12px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+  #studio .wert { fill: var(--muted); font-size: 11px; } #studio .trefferflaeche { fill: transparent; }
+  #studio .q { fill: var(--bg); } #studio .q.star { fill: var(--marke); fill-opacity: .2; }
+  #studio .qname { font: 700 13px var(--titel); fill: var(--ink); text-transform: uppercase; letter-spacing: .04em; }
+  #studio .schwelle { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 6 5; opacity: .45; }
+  #studio .wz { color: var(--ink); opacity: .07; } #studio .in-blase { color: var(--surface); } #studio .dein .in-blase, #studio .in-blase.dein { color: #0B0B0B; }
+  #studio .sym .voll { fill: currentColor; stroke: none; }
+  #studio .pinselpfeil { fill: var(--ink); opacity: .55; } #studio .alt { fill: var(--surface); stroke: var(--ink); stroke-width: 1.8; opacity: .55; }
+  #studio .blase { cursor: pointer; outline: none; } #studio .blase.gewaehlt .punkt, #studio .blase:focus-visible .punkt { stroke: var(--ink); stroke-width: 3.5; }
+  #studio .netz-gitter { fill: none; stroke: var(--raster); } #studio .netz-speiche { stroke: var(--raster); }
+  #studio .netz-dein { fill: var(--marke); fill-opacity: .35; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+  #studio .netz-gruppe { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 5 4; }
+  #studio .zelle { stroke: var(--surface); stroke-width: 2; } #studio .zelle.leer { fill: var(--surface); stroke: var(--line); stroke-dasharray: 3 3; }
+  #studio .skala { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; } #studio .skala span.s { width: 26px; height: 12px; display: inline-block; }
+  #studio .feed { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  #studio .post { border: 1px solid var(--line); border-radius: calc(var(--radius) - 2px); background: var(--bg); overflow: hidden; position: relative; }
+  #studio .post a { color: inherit; text-decoration: none; } #studio .post a:hover b { text-decoration: underline; }
+  #studio .post .bild { position: relative; overflow: hidden; aspect-ratio: 16/9; background: repeating-linear-gradient(135deg, var(--raster) 0 10px, var(--bg) 10px 20px); display: flex; align-items: flex-end; padding: 8px; }
+  #studio .post .bild img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #studio .post .faktor { position: relative; z-index: 1; font: 800 20px/1 var(--titel); background: var(--marke); color: #0B0B0B; padding: 5px 8px; border-radius: 6px; }
+  #studio .post .info { padding: 10px 12px 12px; font-size: 13px; } #studio .post .info b { display: block; font-size: 14px; margin-bottom: 4px; }
+  #studio .post .tag { margin-right: 4px; } #studio .thumb-knopf { margin: 0 12px 12px; }
+  #studio .bau { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
+  #studio .bau label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  #studio .gespeichert { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+  #studio details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 10px; }
+  #studio td.r, #studio th.r { text-align: right; } #studio .stand { font-size: 11px; color: var(--muted); }
+  #studio .portfolio-raster { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; align-items: start; } #studio .portfolio-raster .chart { margin: 0; }
+  #studio .datenfeld { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); padding: 14px 14px 12px; font-size: 13px; min-height: 340px; position: sticky; top: 16px; }
+  #studio .df-leer { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 40px 6px; color: var(--muted); } #studio .df-leer b { color: var(--ink); font-size: 15px; } #studio .df-leer .sym { opacity: .5; }
+  #studio .df-kopf { margin-bottom: 10px; }
+  #studio .df-feld { display: inline-flex; align-items: center; gap: 6px; font: 700 12px/1 var(--titel); text-transform: uppercase; letter-spacing: .05em; background: var(--ink); color: var(--surface); padding: 6px 9px; border-radius: 6px; }
+  #studio .df-feld.star { background: var(--marke); color: #0b0b0b; }
+  #studio .df-name { font: 700 19px/1.15 var(--titel); margin-top: 10px; word-break: break-word; }
+  #studio .df-dein { white-space: nowrap; display: inline-block; font: 700 10px/1 var(--schrift); text-transform: uppercase; letter-spacing: .1em; background: var(--marke); color: #0b0b0b; padding: 3px 6px; border-radius: 4px; vertical-align: 3px; }
+  #studio .df-status { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-weight: 600; font-size: 12px; } #studio .df-status i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  #studio .df-status.lebendig i { background: var(--gut); } #studio .df-status.ruhig i { background: #C9A227; } #studio .df-status.schlaf i { background: #D9822B; } #studio .df-status.tot i { background: var(--schw); }
+  #studio .df-zeile { display: grid; grid-template-columns: 1fr auto auto auto; align-items: baseline; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  #studio .df-zeile span:first-child { color: var(--muted); } #studio .df-zeile b { font-size: 15px; text-align: right; }
+  #studio .df-vorher { color: var(--muted); text-decoration: line-through; } #studio .df-pfeil { color: var(--muted); }
+  #studio .df-spalten { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-top: 6px; }
+  #studio .df-wechsel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--surface); border: 1px dashed var(--ink); border-radius: 8px; padding: 8px 10px; font-weight: 600; }
+  #studio .df-wechsel small { width: 100%; font-weight: 400; color: var(--muted); font-size: 11px; }
+  #studio .df-hinweis { margin-top: 8px; color: var(--muted); font-size: 12px; }
+  #studio .df-fuss { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+  #studio .df-link { display: inline-block; margin-top: 10px; font-weight: 700; color: var(--ink); text-decoration: none; border-bottom: 3px solid var(--marke); }
+  #s-tip { position: fixed; pointer-events: none; z-index: 50; background: var(--ink); color: var(--surface); font-size: 12px; padding: 7px 10px; border-radius: 8px; max-width: 260px; opacity: 0; transition: opacity .1s; line-height: 1.4; }
+  #s-tip.an { opacity: 1; } #s-tip b { color: var(--marke); } :root[data-look="paper"] #s-tip b { color: var(--surface); }
+  #s-toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 14px; font-weight: 600; font-size: 13px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #s-toast.an { opacity: 1; }
+  @media (max-width: 1100px) { #studio .portfolio-raster { grid-template-columns: 1fr; } #studio .datenfeld { position: static; min-height: 0; } }
+  @media (max-width: 899px) { #s-flaeche { grid-template-columns: 1fr; } #s-flaeche .kachel.halb { grid-column: span 1; } }
 </style>
 </head>
 <body>
 <main>
   <header class="kopf">
-    <h1><img class="hk-symbol" src="icons/icon.svg" alt=""><span class="hk" aria-label="HandKess"><span class="hk-hand">HAND</span><span class="hk-punkt"></span><span class="hk-kess">KESS</span></span><span class="hk-sub">Social Radar · Vergleich</span></h1>
+    <h1><img class="hk-symbol" src="icons/icon.svg" alt=""><span class="hk" aria-label="HandKess"><span class="hk-hand">HAND</span><span class="hk-punkt"></span><span class="hk-kess">KESS</span></span><span class="hk-sub">Social Radar · <span id="ansicht-titel">Vergleich</span></span></h1>
     <button id="thema" title="Hell/Dunkel umschalten">☾ Dunkel</button>
     <button id="look" title="Paper-Look an/aus">▤ Paper</button>
     <button id="layout" class="nur-desktop">Layout anpassen</button>
@@ -138,8 +229,23 @@
   <div class="reihe" id="filter-plattform"></div>
   <div class="reihe" id="filter-zeitraum"></div>
   <div id="kacheln"></div>
+  <!-- Analyse•Studio: dieselbe Seite, derselbe Look – wird beim Umschalten statt des Vergleichs gezeigt (v2.3.3) -->
+  <section id="studio" hidden aria-label="Analyse-Studio">
+    <nav class="reihe" id="s-nav" aria-label="Module">
+      <button class="chip an" data-modul="alle">Übersicht</button><button class="chip" data-modul="portfolio">Portfolio</button><button class="chip" data-modul="netz">Du gegen die Gruppe</button>
+      <button class="chip" data-modul="bau">Diagramm-Baukasten</button><button class="chip" data-modul="formate">Formate</button><button class="chip" data-modul="zeiten">Posting-Zeiten</button><button class="chip" data-modul="ausreisser">Ausreißer</button>
+    </nav>
+    <div class="reihe" id="s-ordner"></div>
+    <div class="reihe" id="s-gruppe"></div>
+    <div class="reihe" id="s-zeitraum"></div>
+    <div class="plakate" id="s-plakate"></div>
+    <div id="s-flaeche"></div>
+  </section>
 </main>
+<div id="s-tip" role="status"></div>
+<div id="s-toast"></div>
 <script src="kern.js"></script>
 <script src="radar-dashboard.js"></script>
+<script src="radar-analyse.js"></script>
 </body>
 </html>

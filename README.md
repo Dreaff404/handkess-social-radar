@@ -15,7 +15,7 @@
 
 > **Status: in Entwicklung – Forschungsprojekt.** Das Social Radar ist ein privates Werkzeug, an dem ich aktuell arbeite. Es dient einer Untersuchung: **An welchen Kennzahlen lässt sich die Entwicklung eines Kanals frühzeitig erkennen, und welche geben verlässlich Auskunft über seinen Lebenszyklus – absolut und im Vergleich zu anderen Kanälen?** Die Berechnungen sind bewusst offen dokumentiert, aber noch nicht feinjustiert. Wie stark etwa die theoretische Engagement-Rate gegenüber den Views zählen sollte, ist genau eine der offenen Fragen; die Gewichte sind ein erster, begründeter Vorschlag und werden mit echten Verläufen geprüft.
 
-> **English summary:** HandKess Social Radar is a Chrome extension (Manifest V3) for portfolio and competitor analysis of social media channels, currently in development as part of a research project on which metrics reliably indicate a channel's development and life cycle. It overlays rankings and KPIs directly on YouTube, Instagram, TikTok and Facebook pages, lets you save your own and third-party channels into folders, compares them in a dashboard and places them in a BCG-style portfolio matrix (Star, Question Mark, Cash Cow, Poor Dog) including their movement over the last four weeks. All data stays in the local browser storage; the only network connection is the official YouTube Data API with the user's own key. UI and documentation are in German.
+> **English summary:** HandKess Social Radar is a Chrome extension (Manifest V3) for portfolio and competitor analysis of social media channels, currently in development as part of a research project on which metrics reliably indicate a channel's development and life cycle. It overlays rankings and KPIs directly on YouTube, Instagram, TikTok and Facebook pages, lets you save your own and third-party channels into folders, compares them in a dashboard and places them in a BCG-style portfolio matrix (Star, Question Mark, Cash Cow, Poor Dog) including their movement over the last four weeks. For YouTube it separates long videos and Shorts (channel mix), tracks selected videos at fixed points after upload and detects thumbnail changes. All data stays in the local browser storage; network connections go only to YouTube: the official YouTube Data API with the user's own key and YouTube's image server for thumbnails. UI and documentation are in German.
 
 ---
 
@@ -28,7 +28,7 @@ Wer Kanäle verantwortet, will sie steuern: Wo stehen die eigenen Kanäle, wie e
 - **Inhalte besser platzieren** – welche Formate, Themen und Posting-Zeiten bei wem funktionieren, welche Beiträge weit über dem Normalniveau laufen.
 - **Entwicklungen und Plattformtrends frühzeitig erkennen** – Bewegungen in der Matrix, aufkommende Formate und Verschiebungen auf der Plattform werden sichtbar, bevor sie in den Gesamtzahlen auffallen.
 
-Die Analyse passiert dort, wo man ohnehin arbeitet: auf der Kanalseite selbst. Gespeicherte Kanäle landen im Vergleichs-Dashboard und im **Analyse-Studio**, das sie wie ein Portfolio führt.
+Die Analyse passiert dort, wo man ohnehin arbeitet: auf der Kanalseite selbst. Gespeicherte Kanäle landen im Dashboard – mit den Reitern **Vergleich** und **Analyse•Studio**, das sie wie ein Portfolio führt.
 
 ## Forschungsfrage und offene Punkte
 
@@ -37,6 +37,7 @@ Das Tool ist zugleich Werkzeug und Versuchsaufbau für die Frage, welche KPIs di
 - **Gewichtung:** Wie stark sollen Views, theoretische Engagement-Rate und Reichweite in die Stärke eines Kanals eingehen – und wie Views-Trend, Follower-Wachstum und ER-Trend in seine Dynamik?
 - **Verknüpfung der Kennzahlen:** Engagement ohne Bezug zur Reichweite (und umgekehrt) erzählt nur die halbe Geschichte; gesucht sind Kombinationen, die zusammen aussagekräftig sind.
 - **Robustheit:** Ein einzelner viraler Beitrag kann den Durchschnitt verzerren – Median oder Durchschnitt, und über welchen Zeitraum?
+- **Messdichte:** Views pro Stunde und Thumbnail-Wechsel brauchen regelmäßige Messpunkte. Solange das Radar nur im Browser misst, entstehen Lücken; für eine lückenlose Erhebung braucht es später einen eigenen Server.
 - **Lebenszyklus-Signale:** Welche Muster (Aktivität, Rhythmus, Wachstum, Community-Bindung) kündigen Aufstieg, Plateau oder Rückgang an?
 
 Die aktuelle Methodik steht vollständig in [docs/KENNZAHLEN.md](docs/KENNZAHLEN.md).
@@ -44,28 +45,38 @@ Die aktuelle Methodik steht vollständig in [docs/KENNZAHLEN.md](docs/KENNZAHLEN
 ## Funktionen
 
 ### 1. Radar direkt auf der Plattform
-- **Rangliste statt Raster:** Beiträge eines Kanals nach den besten oder schlechtesten sortieren – nach theoretischer Engagement-Rate, Reichweite, Views, Likes, Kommentaren oder Views pro Tag, gefiltert nach 30/60/90 Tagen oder einem Jahr.
+- **Rangliste statt Raster:** Beiträge eines Kanals nach den besten oder schlechtesten sortieren – nach theoretischer Engagement-Rate, Reichweite, Views, Likes, Kommentaren oder Views pro Tag, gefiltert nach 7/30/60/90 Tagen, einem Jahr oder allen Beiträgen – jede Kennzahl mit Veränderung zum gleich langen Zeitraum davor.
 - **Kanal-Kennzahlen auf einen Blick:** Follower, Ø Views, Ø Engagement-Rate, Reichweiten-Score.
 - **Overlays auf den Vorschaubildern** mit Rang und Ampel; eine einklappbare Leiste am einzelnen Video mit Einordnung im Kanal.
 - **Format-Hashtags:** eigene Formate vergeben (z. B. `#tutorial`, `#hook-frage`) und auswerten, welches Format trägt.
 - **Marker:** Stand eines Kanals festhalten und später die Entwicklung sehen.
 - **Views-Schätzung** für Beiträge ohne öffentliche Views (Instagram-Bilder, Facebook-Fotos) – als Spanne, mit Selbsttest, nie mit echten Zahlen vermischt.
+- **Kanal-Mix (YouTube): Videos und Shorts** getrennt und zusammen – Uploads pro Woche, Ø Länge, Ø Views, theoretische ER, Reichweite und Views der Uploads im Zeitraum, je mit Veränderung zum Vorzeitraum; dazu die **Ausrichtung** nach Uploads und nach Views (eher Video- oder eher Shorts-Kanal). Die Basis jeder Zahl ist wählbar und sichtbar: Videos, Shorts oder beides.
+- **YouTube-Videoseite:** Leiste rechts über den Vorschlägen mit großem Thumbnail und Download in voller Auflösung, Platz im Kanal (unter den Videos und inklusive Shorts), einklappbaren Abschnitten und – *in Entwicklung* – **Leistung über die Zeit**: Views pro Stunde seit Upload und zwischen zwei Messungen, Verlaufskurve und **Thumbnail-Wechsel** mit Views pro Stunde je Version (Hinweis auf A/B-Tests).
+- **Video-Tracking** *(in Entwicklung)*: einzelne Videos gezielt beobachten – gemessen 1, 4, 8, 12 und 24 Stunden sowie 2 und 7 Tage nach Upload, gebündelt und sparsam über die offizielle API.
 
 | Kanalseite mit Rangliste | Eingeklappt: Rang und ER auf jedem Vorschaubild |
 |---|---|
 | ![Rangliste auf einer YouTube-Kanalseite](docs/screenshots/01_kanal_rangliste.png) | ![Overlays auf den Vorschaubildern](docs/screenshots/02_kanal_overlays.png) |
 
-![Leiste am einzelnen Video mit Einordnung im Kanal](docs/screenshots/03_videoseite.png)
+![Leiste rechts auf der Videoseite mit Thumbnail und Einordnung im Kanal](docs/screenshots/03_videoseite.png)
 
-### 2. Vergleichs-Dashboard
+| Kanal-Mix: Videos und Shorts | Video-Tracking zu festen Zeitpunkten |
+|---|---|
+| ![Kanal-Mix mit Ausrichtung nach Uploads und Views](docs/screenshots/12_kanal_mix.png) | ![Leistung über die Zeit mit Tracking](docs/screenshots/13_tracking.png) |
+
+<p align="center"><img src="docs/screenshots/14_einstellungen_nachladen.png" alt="Einstellungen: tägliches Nachladen, getrackte Videos und API-Verbrauch" width="560"></p>
+
+### 2. Dashboard: Vergleich
+Das Dashboard hat zwei Reiter auf derselben Seite – **Vergleich** und **Analyse•Studio**. Hell/Dunkel, Paper-Look und „Layout anpassen“ gelten für beide.
 - Nur selbst gespeicherte Kanäle, in eigenen Ordnern (z. B. „Wissen & Bildung“, „Creator“, „Marken & Unternehmen“).
 - Kanal-Score mit Ampel im Vergleich zur Gruppe, Trend, Top-Formate, Abstand zum eigenen Kanal.
 - Entwicklung über die Zeit aus wöchentlichen Ständen.
 
 ![Vergleichs-Dashboard](docs/screenshots/04_dashboard_vergleich.png)
 
-### 3. Analyse-Studio
-Eine eigene Analyse-Seite im HandKess-Stil. Gerechnet wird immer je Plattform und Bereich, weil Views zwischen Plattformen nicht vergleichbar sind.
+### 3. Dashboard: Analyse•Studio
+Der zweite Reiter des Dashboards. Gerechnet wird immer je Plattform und Bereich, weil Views zwischen Plattformen nicht vergleichbar sind.
 
 | Modul | Frage, die es beantwortet |
 |---|---|
@@ -102,15 +113,17 @@ Die Erweiterung ist nicht im Chrome Web Store, sondern wird entpackt geladen:
    2. „APIs & Dienste“ → „Bibliothek“ → **YouTube Data API v3** aktivieren.
    3. „Anmeldedaten“ → „API-Schlüssel“ erstellen und auf die YouTube Data API v3 beschränken.
    4. Schlüssel in den Einstellungen einfügen, speichern, testen.
-5. Einen YouTube-Kanal öffnen – das Radar erscheint über den Videos. Mit **„☆ Speichern“** landet der Kanal im Dashboard; ein Klick auf das Erweiterungs-Symbol öffnet den Vergleich, von dort geht es ins **Analyse-Studio**.
+5. Einen YouTube-Kanal öffnen – das Radar erscheint über den Videos. Mit **„☆ Speichern“** landet der Kanal im Dashboard; ein Klick auf das Erweiterungs-Symbol öffnet das Dashboard mit den Reitern **Vergleich** und **Analyse•Studio**.
 
 Instagram, TikTok und Facebook brauchen keinen Schlüssel: Das Radar liest dort nur die Zahlen mit, die die Seite im Browser ohnehin lädt.
 
 ## Datenschutz und Grundsätze
 
 - **Alles bleibt lokal** im Speicher des Browsers. Keine eigene Cloud, kein Konto, keine Telemetrie.
-- **Einzige Netzwerkverbindung:** die offizielle YouTube Data API (`googleapis.com`) mit dem eigenen Schlüssel – im Kopf der Anfrage, nicht in der Adresse.
-- **Keine eigenen Abrufe** bei Instagram, TikTok und Facebook; kein Crawling im Hintergrund, keine Umgehung von Schutzmechanismen.
+- **Zwei Netzwerkverbindungen, beide zu YouTube:** die offizielle YouTube Data API (`googleapis.com`) mit dem eigenen Schlüssel – im Kopf der Anfrage, nicht in der Adresse – und YouTubes Bildserver (`i.ytimg.com`) für Thumbnails.
+- **Automatisches Nachladen und Video-Tracking nur auf Wunsch** – höchstens zehn gespeicherte YouTube-Kanäle einmal täglich und sparsam, höchstens 20 getrackte Videos, nur solange Chrome läuft.
+- **Festes API-Budget:** Automatische Abrufe verbrauchen höchstens 2.000 der 10.000 Tageseinheiten und nie mehr als 80 % des Kontingents – für das eigene Arbeiten bleibt immer Puffer.
+- **Keine eigenen Abrufe** bei Instagram, TikTok und Facebook; kein Crawling, keine Umgehung von Schutzmechanismen.
 - **Private Facebook-Profile sind gesperrt**, LinkedIn ist bewusst nicht unterstützt.
 
 Details in **[DATENSCHUTZ.md](DATENSCHUTZ.md)**. Die Nutzungsbedingungen der jeweiligen Plattform gelten weiterhin; die Erweiterung ist ein Analyse-Werkzeug für öffentlich sichtbare Zahlen.

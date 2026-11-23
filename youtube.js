@@ -42,9 +42,11 @@ const RadarYouTube = (() => {
 
   // Übersicht: Reihen statt Raster (ytd-section-list-renderer). Das Panel sitzt davor, Overlays kommen auf jedes Vorschaubild.
   const abschnitte = () => browse()?.querySelector("#primary > ytd-section-list-renderer, ytd-section-list-renderer");
-  // Videoseite: Leiste direkt unter dem Player, vor Titel und Kanalzeile (ytd-watch-metadata)
+  // Videoseite (seit v2.2, André 2026-11-17): Leiste rechts über den Videovorschlägen (#related). Bei schmalem Fenster
+  // schiebt YouTube die Vorschläge unter das Video – die Leiste wandert mit. Fehlen sie, wie früher unter dem Player.
   const unterPlayer = () => document.querySelector("ytd-watch-flexy:not([hidden]) #below ytd-watch-metadata");
-  const anker = bereich => bereich === "video" ? unterPlayer() : bereich === "uebersicht" ? abschnitte() : raster();
+  const vorschlaege = () => document.querySelector("ytd-watch-flexy:not([hidden]) #related");
+  const anker = bereich => bereich === "video" ? (vorschlaege() || unterPlayer()) : bereich === "uebersicht" ? abschnitte() : raster();
   const beobachtung = bereich => bereich === "video" ? { ziel: null } : bereich === "uebersicht"
     ? { ziel: abschnitte(), art: { childList: true, subtree: true } }
     : { ziel: rasterInhalt(), art: { childList: true } };
@@ -79,15 +81,16 @@ const RadarYouTube = (() => {
       const v = await nachricht({ typ: "video", id: s.videoId, neu });
       if (!v) return KEINE_ANTWORT;
       if (v.ohneSchluessel || v.fehler) return v;
-      // Kanal des Videos: lange Videos; ist das Video dort nicht dabei, die Shorts
+      // Kanal des Videos: immer lange Videos UND Shorts (v2.3) – die Liste mit dem Video ist „daten“, die andere „zweit“,
+      // damit die Platzierung wahlweise nur innerhalb der Art oder über alles gezeigt werden kann
       let k = await nachricht({ typ: "kanal", kanalId: v.kanalId, bereich: "videos", neu });
-      if (k && !k.fehler && !k.videos.some(x => x.id === v.id)) {
-        const ks = await nachricht({ typ: "kanal", kanalId: v.kanalId, bereich: "shorts", neu });
-        if (ks && !ks.fehler && !ks.gemischt && ks.videos.some(x => x.id === v.id)) k = ks;
-      }
+      let ks = await nachricht({ typ: "kanal", kanalId: v.kanalId, bereich: "shorts", neu });
+      if (ks?.fehler || ks?.gemischt) ks = null;
+      if (k && !k.fehler && ks && !k.videos.some(x => x.id === v.id) && ks.videos.some(x => x.id === v.id)) [k, ks] = [ks, k];
       const ok = k && !k.fehler;
       return {
         daten: ok ? k : { kanal: { id: v.kanalId, name: v.kanalName, follower: 0 }, videos: [], bereich: "videos", geladenAm: v.geladenAm },
+        zweit: ok && ks && !ks.fehler ? ks : null,
         einzel: { ...v, url: location.href },
         hinweis: ok ? "" : (k?.fehler || "Kanaldaten fehlen.") + " Die Einordnung im Kanal fehlt deshalb."
       };
@@ -96,16 +99,18 @@ const RadarYouTube = (() => {
     const a = await nachricht({ typ: "kanal", handle: s.handle, kanalId: s.kanalId, bereich: ueb ? "videos" : s.bereich, neu });
     if (!a) return KEINE_ANTWORT;
     if (a.ohneSchluessel || a.fehler) return a;
-    // Übersicht: dazu die Shorts – ohne getrennte Shorts-Liste (gemischt) oder bei Fehler kein Shorts-Block
-    const b = ueb ? await nachricht({ typ: "kanal", handle: s.handle, kanalId: s.kanalId, bereich: "shorts", neu }) : null;
-    return { daten: a, zweit: b && !b.fehler && !b.gemischt ? b : null };
+    // Immer auch die andere Art laden (v2.3): Übersicht und Videos-Tab → Shorts, Shorts-Tab → Videos.
+    // Ohne getrennte Liste (gemischt) oder bei Fehler gibt es keinen Kanal-Mix.
+    const b = await nachricht({ typ: "kanal", handle: s.handle, kanalId: s.kanalId, bereich: s.bereich === "shorts" ? "videos" : "shorts", neu });
+    return { daten: a, zweit: b && !b.fehler && !b.gemischt && !a.gemischt ? b : null };
   }
 
   const ranglistePfad = d => (d.kanal.handle ? "/" + d.kanal.handle.replace(/^(?!@)/, "@") : "/channel/" + d.kanal.id) + "/" + (d.bereich === "shorts" ? "shorts" : "videos");
 
   return {
     id: "youtube", name: "YouTube", seite, raster, rasterInhalt, anker, beobachtung, kacheln, vorschaubilder, videoId, dunkel, beiNavigation,
-    laden, ranglistePfad, dunkelAttribut: "dark", bildFormat: "16/9",
+    laden, ranglistePfad, dunkelAttribut: "dark", bildFormat: "16/9", seitenleiste: bereich => bereich === "video" && !!vorschlaege(),
+    thumbnails: true,
     mitRaster: bereich => bereich === "videos" || bereich === "shorts",
     bereichName: { videos: "Videos", shorts: "Shorts", uebersicht: "Übersicht" },
     begriffe: { follower: "Abonnenten", folgerKurz: "Abos", einheit: "Video", einheiten: "Videos", dieses: "Dieses Video", kanal: "Kanal", tagsCreator: "Tags", keineTags: "Der Creator hat keine Tags hinterlegt.", ladeKnopf: "Neu laden" }

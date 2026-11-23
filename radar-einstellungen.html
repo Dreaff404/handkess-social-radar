@@ -27,6 +27,15 @@
   @media (prefers-color-scheme: dark) { .hk-kess { background: none; color: var(--marke); } }
   ol { padding-left: 20px; margin: 8px 0 0; font-size: 14px; } li { margin: 4px 0; }
   #meldung { min-height: 22px; margin-top: 10px; font-size: 14px; } .ok { color: var(--gut); } .fehler { color: var(--schw); }
+  .entw { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; background: var(--marke); color: #0b0b0b; padding: 2px 6px; border-radius: 3px; vertical-align: 3px; }
+  .auto-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-top: 12px; }
+  .auto-liste label { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; border: 1px solid var(--linie); border-radius: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+  .auto-liste input { width: auto; margin: 0; }
+  .verbrauch-bahn { position: relative; height: 14px; border-radius: 7px; background: var(--bg); border: 1px solid var(--linie); overflow: hidden; margin: 8px 0 6px; }
+  .verbrauch-bahn i { position: absolute; top: 0; bottom: 0; } #verbrauchAuto { left: 0; background: var(--marke); } #verbrauchHand { background: var(--leise); }
+  #verbrauchGrenze { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
+  .track { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--linie); color: var(--ink); }
+  .track button { height: 32px; }
 </style>
 </head>
 <body>
@@ -68,6 +77,22 @@
       <button id="speichernAuswertung" class="haupt" type="button">Speichern</button>
       <button id="cacheLeeren" type="button">Zwischenspeicher leeren</button>
     </div>
+  </section>
+  <section id="auto">
+    <h2>Automatisch nachladen <span class="entw">in Entwicklung</span></h2>
+    <div class="leise">Ausgewählte gespeicherte YouTube-Kanäle werden <b>einmal täglich</b> sparsam aktualisiert – Kanal-Kennzahlen und die neuesten Videos und Shorts. Daraus entstehen der Verlauf der Kanal-Views („Views in 7 / 30 Tagen“) und Messpunkte für neue Videos. Höchstens 10 Kanäle.<br>Einzelne Videos trackst du direkt auf der Videoseite („◎ Video tracken“): gemessen wird nach 1, 4, 8, 12, 24 Stunden, 2 und 7 Tagen.<br><b>Wichtig:</b> Das läuft nur, solange Chrome geöffnet ist; verpasste Messungen holt Chrome beim nächsten Start nach (mit der tatsächlichen Uhrzeit). Für eine lückenlose Messung braucht es später einen eigenen Server.</div>
+    <div id="autoListe" class="auto-liste"></div>
+    <div class="leise" id="autoKosten" style="margin-top:8px"></div>
+    <div class="zeile" style="margin-top:10px">
+      <button id="speichernAuto" class="haupt" type="button">Speichern</button>
+      <button id="jetztAuto" type="button">Jetzt einmal nachladen</button>
+    </div>
+    <div class="leise" id="autoStand" style="margin-top:8px"></div>
+    <h2 style="margin-top:18px">Getrackte Videos</h2>
+    <div id="trackListe" class="leise"></div>
+    <h2 style="margin-top:18px">API-Verbrauch heute</h2>
+    <div class="verbrauch"><div class="verbrauch-bahn"><i id="verbrauchAuto"></i><i id="verbrauchHand"></i><span id="verbrauchGrenze"></span></div></div>
+    <div class="leise" id="verbrauchText"></div>
   </section>
   <div id="meldung" role="status"></div>
 </main>
